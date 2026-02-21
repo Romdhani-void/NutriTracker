@@ -14,11 +14,11 @@ cozy-calories/
 
 ## Microservices Overview
 
-| Service | Port | Responsibility |
-|---|---|---|
-| UserService | 3001 | Email registration, token generation/validation, display name |
-| GoalService | 3002 | Weight/height/age/gender input, BMR & TDEE calculation, daily calorie target |
-| DailyLogService | 3003 | Log food entries per day, sum calories, compute goal status (met/not met) |
+| Service         | Port | Responsibility                                                               |
+| --------------- | ---- | ---------------------------------------------------------------------------- |
+| UserService     | 3001 | Email registration, token generation/validation, display name                |
+| GoalService     | 3002 | Weight/height/age/gender input, BMR & TDEE calculation, daily calorie target |
+| DailyLogService | 3003 | Log food entries per day, sum calories, compute goal status (met/not met)    |
 
 ## Quick Start
 
