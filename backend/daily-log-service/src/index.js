@@ -1,0 +1,34 @@
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const dailyLogRoutes = require('./daily-log.routes');
+
+const app = express();
+const PORT = process.env.PORT || 3003;
+
+// ─── Middleware ───────────────────────────────────────────────────────────────
+app.use(cors());
+app.use(express.json());
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+app.use('/logs', dailyLogRoutes);
+
+// ─── Health Check ─────────────────────────────────────────────────────────────
+app.get('/health', (req, res) => {
+  res.json({ service: 'DailyLogService', status: 'ok', port: PORT });
+});
+
+// ─── Database + Server ────────────────────────────────────────────────────────
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log('✅ DailyLogService connected to MongoDB');
+    app.listen(PORT, () => {
+      console.log(`🫖 DailyLogService running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err.message);
+    process.exit(1);
+  });

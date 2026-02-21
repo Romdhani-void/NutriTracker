@@ -1,0 +1,62 @@
+Got it—stripping it down to just calorie tracking, no fitness, no workouts. Here’s a very detailed, ready-to-run AI prompt for a minimal, cozy Calorie Tracker app using microservices:
+
+
+Prompt (Calorie Tracker Only, Minimal & Cozy):
+I want you to generate a full project idea and functional application concept for a minimal, cozy Calorie Tracker app.
+Core idea: Users track their daily calorie intake and see if they meet their daily calorie goal. The app should be simple, visually clear, and feel cozy and calm, suitable for a GitHub portfolio.
+User Flow:
+User opens the app and clicks “Start Tracking.”
+User enters:
+Email address (used for one-time token access to edit their data)
+Preferred display name (shown publicly)
+The system sends a one-time token to the email. The user enters the token to unlock their edit dashboard.
+User sets body details:
+Weight
+Height
+Age
+Gender
+User sets daily calorie goal (for example, calories to maintain weight, lose fat, or gain weight).
+Each day, the user logs foods with their calorie values.
+The daily dashboard shows:
+Total calories consumed that day
+Whether the daily goal is met (green) or not met (red)
+Users can view all previous days’ logs in chronological order.
+Core Features:
+Lightweight, passwordless authentication using email token
+Body details input and daily calorie goal setting
+Daily food logging with calorie tracking
+Chronological view of all past daily logs
+Visual feedback for goal achievement (green/red)
+Cozy, minimalistic UI with soft colors, clean charts, or colored indicators
+Microservices Architecture Suggestions:
+UserService – manages user email, display name, and token-based authentication
+GoalService – calculates daily calorie targets based on body details and user goal
+DailyLogService – stores daily calorie entries and calculates goal status for the day
+AnalyticsService (optional) – aggregates data for visualizations like weekly totals or averages
+Suggested Tech Stack:
+Frontend: Angular or React with TailwindCSS for cozy UI
+Backend / Microservices: Node.js + Express or NestJS
+Database: MongoDB (flexible schema for daily logs)
+Visuals / Charts: Chart.js or Recharts for minimal progress charts
+Email Token Service: NodeMailer or transactional email API
+Data Models:
+User:
+email
+displayName
+token (expires after short time)
+Goal:
+userEmail
+weight, height, age, gender
+dailyCalorieTarget
+DailyLog:
+userEmail
+date (YYYY-MM-DD)
+caloriesConsumed
+goalStatus (met/not met → determines green/red display)
+Possible Future Enhancements:
+Weekly or monthly calorie charts
+Meal-level tracking (optional food names)
+Export daily logs as CSV or PDF
+Optional community sharing of meals (anonymized)
+⚠️ Do NOT include fitness, workouts, DevOps, deployment, cloud, or monitoring.
+The app should be minimal, cozy, and professional, showcasing microservices architecture, front-end/back-end integration, and clear visual feedback for daily calorie goals.

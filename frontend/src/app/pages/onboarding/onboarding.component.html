@@ -1,0 +1,174 @@
+<div class="page-wrapper flex flex-col items-center justify-center min-h-screen">
+
+  <!-- Header -->
+  <div class="animate-fade-in-up mb-8 text-center">
+    <div class="text-5xl mb-3 select-none">📋</div>
+    <h1 class="font-display text-3xl font-semibold text-[#3d2a1e]">Let's set you up</h1>
+    <p class="font-body text-[#7a5c45] text-sm mt-1 italic">
+      Just a few details to calculate your daily calorie goal.
+    </p>
+  </div>
+
+  <!-- Step indicator -->
+  <div class="flex items-center gap-3 mb-6 animate-fade-in">
+    @for (n of [1, 2, 3]; track n) {
+      <div class="flex items-center gap-2">
+        <div
+          class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-display font-semibold transition-all duration-300"
+          [class.bg-terracotta-500]="step() >= n"
+          [class.text-parchment-50]="step() >= n"
+          [class.bg-parchment-200]="step() < n"
+          [class.text-bark-700]="step() < n"
+        >{{ n }}</div>
+        @if (n < 3) {
+          <div class="w-8 h-px transition-all duration-300"
+               [class.bg-terracotta-500]="step() > n"
+               [class.bg-parchment-300]="step() <= n"></div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Card -->
+  <div class="card w-full max-w-sm">
+
+    <!-- ── Step 1: Body Details ─────────────────────── -->
+    @if (step() === 1) {
+      <div class="stagger flex flex-col gap-4 animate-scale-in">
+        <div class="animate-fade-in-up">
+          <h2 class="font-display text-xl font-semibold">Your body details</h2>
+          <p class="text-[#7a5c45] text-xs mt-1 font-body">Used to calculate your BMR and TDEE.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 animate-fade-in-up">
+          <div>
+            <label class="label-cozy">Weight (kg)</label>
+            <input class="input-cozy" type="number" [(ngModel)]="form.weight" min="30" max="300" />
+          </div>
+          <div>
+            <label class="label-cozy">Height (cm)</label>
+            <input class="input-cozy" type="number" [(ngModel)]="form.height" min="100" max="250" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 animate-fade-in-up">
+          <div>
+            <label class="label-cozy">Age</label>
+            <input class="input-cozy" type="number" [(ngModel)]="form.age" min="10" max="110" />
+          </div>
+          <div>
+            <label class="label-cozy">Gender</label>
+            <select class="select-cozy" [(ngModel)]="form.gender">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="animate-fade-in-up">
+          <label class="label-cozy">Activity level</label>
+          <select class="select-cozy" [(ngModel)]="form.activityLevel">
+            @for (opt of activityOptions; track opt.value) {
+              <option [value]="opt.value">{{ opt.label }} — {{ opt.desc }}</option>
+            }
+          </select>
+        </div>
+
+        @if (error()) {
+          <p class="text-[#a85f5f] text-xs font-body bg-[#a85f5f]/10 rounded-xl px-3 py-2">{{ error() }}</p>
+        }
+
+        <button class="btn-primary animate-fade-in-up" (click)="nextStep()">
+          Next → Choose your goal
+        </button>
+      </div>
+    }
+
+    <!-- ── Step 2: Goal Type ────────────────────────── -->
+    @if (step() === 2) {
+      <div class="stagger flex flex-col gap-5 animate-scale-in">
+        <div class="animate-fade-in-up">
+          <h2 class="font-display text-xl font-semibold">What's your goal?</h2>
+          <p class="text-[#7a5c45] text-xs mt-1 font-body">This adjusts your daily calorie target.</p>
+        </div>
+
+        <div class="flex flex-col gap-3 animate-fade-in-up">
+          @for (opt of goalOptions; track opt.value) {
+            <label
+              class="flex items-center gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200"
+              [class.border-terracotta-500]="form.goalType === opt.value"
+              [class.bg-[#fdf6ec]]="form.goalType === opt.value"
+              [class.border-parchment-300]="form.goalType !== opt.value"
+              [class.bg-white]="form.goalType !== opt.value"
+            >
+              <input type="radio" class="sr-only" [value]="opt.value" [(ngModel)]="form.goalType" />
+              <span class="text-2xl">{{ opt.emoji }}</span>
+              <div>
+                <div class="font-display font-semibold text-sm text-[#3d2a1e]">{{ opt.label }}</div>
+                <div class="text-[#7a5c45] text-xs font-body mt-0.5">{{ opt.desc }}</div>
+              </div>
+              @if (form.goalType === opt.value) {
+                <div class="ml-auto w-5 h-5 rounded-full bg-terracotta-500 flex items-center justify-center">
+                  <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                  </svg>
+                </div>
+              }
+            </label>
+          }
+        </div>
+
+        <div class="flex gap-3 animate-fade-in-up">
+          <button class="btn-ghost flex-1" (click)="prevStep()">← Back</button>
+          <button class="btn-primary flex-1" (click)="onSubmit()" [disabled]="loading()">
+            @if (loading()) {
+              <span class="inline-block w-4 h-4 border-2 border-[#fdfaf5]/40 border-t-[#fdfaf5] rounded-full animate-spin"></span>
+              Calculating…
+            } @else {
+              Calculate my goal →
+            }
+          </button>
+        </div>
+
+        @if (error()) {
+          <p class="text-[#a85f5f] text-xs font-body bg-[#a85f5f]/10 rounded-xl px-3 py-2">{{ error() }}</p>
+        }
+      </div>
+    }
+
+    <!-- ── Step 3: Result ──────────────────────────── -->
+    @if (step() === 3 && result()) {
+      <div class="stagger flex flex-col gap-5 animate-scale-in text-center">
+        <div class="animate-fade-in-up">
+          <div class="text-5xl mb-3">✨</div>
+          <h2 class="font-display text-2xl font-semibold text-[#3d2a1e]">Your goal is set!</h2>
+        </div>
+
+        <!-- Numbers breakdown -->
+        <div class="grid grid-cols-3 gap-3 animate-fade-in-up">
+          <div class="card-sm text-center">
+            <div class="font-display text-xl font-semibold text-[#b05c3a]">{{ result()!.bmr }}</div>
+            <div class="text-[#7a5c45] text-xs mt-1 font-body">BMR</div>
+          </div>
+          <div class="card-sm text-center">
+            <div class="font-display text-xl font-semibold text-[#b05c3a]">{{ result()!.tdee }}</div>
+            <div class="text-[#7a5c45] text-xs mt-1 font-body">TDEE</div>
+          </div>
+          <div class="card-sm text-center bg-[#b05c3a]/5 border-[#b05c3a]/30">
+            <div class="font-display text-xl font-semibold text-[#b05c3a]">{{ result()!.target }}</div>
+            <div class="text-[#7a5c45] text-xs mt-1 font-body">Daily goal</div>
+          </div>
+        </div>
+
+        <p class="text-[#7a5c45] text-xs font-body italic animate-fade-in-up">
+          All values in kcal/day. You can update these anytime from settings.
+        </p>
+
+        <button class="btn-primary animate-fade-in-up" (click)="goToDashboard()">
+          Start tracking today →
+        </button>
+      </div>
+    }
+
+  </div>
+</div>

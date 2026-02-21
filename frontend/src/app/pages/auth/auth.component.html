@@ -1,0 +1,141 @@
+<div class="page-wrapper flex flex-col items-center justify-center min-h-screen">
+
+  <!-- Hero mark -->
+  <div class="animate-fade-in-up mb-8 text-center">
+    <div class="text-6xl mb-4 select-none">🫖</div>
+    <h1 class="font-display text-4xl font-semibold text-[#3d2a1e] leading-tight">
+      Cozy Calories
+    </h1>
+    <p class="font-body text-[#7a5c45] mt-2 text-sm italic">
+      Simple, warm, daily calorie tracking.
+    </p>
+  </div>
+
+  <!-- Card -->
+  <div class="card w-full max-w-sm animate-scale-in">
+
+    <!-- ── Step: Register ───────────────────────────── -->
+    @if (step() === 'register') {
+      <div class="stagger flex flex-col gap-5">
+
+        <div class="animate-fade-in-up">
+          <h2 class="font-display text-xl font-semibold text-[#3d2a1e]">
+            Start tracking
+          </h2>
+          <p class="text-[#7a5c45] text-xs mt-1 font-body">
+            Enter your email and we'll send you a one-time code to log in.
+          </p>
+        </div>
+
+        <div class="animate-fade-in-up">
+          <label class="label-cozy">Display name</label>
+          <input
+            class="input-cozy"
+            type="text"
+            placeholder="e.g. Alex"
+            [(ngModel)]="displayName"
+            (keydown.enter)="onRegister()"
+            autocomplete="name"
+          />
+        </div>
+
+        <div class="animate-fade-in-up">
+          <label class="label-cozy">Email address</label>
+          <input
+            class="input-cozy"
+            type="email"
+            placeholder="you@example.com"
+            [(ngModel)]="email"
+            (keydown.enter)="onRegister()"
+            autocomplete="email"
+          />
+        </div>
+
+        @if (error()) {
+          <p class="text-[#a85f5f] text-xs font-body animate-fade-in bg-[#a85f5f]/10 rounded-xl px-3 py-2">
+            {{ error() }}
+          </p>
+        }
+
+        <button
+          class="btn-primary animate-fade-in-up"
+          (click)="onRegister()"
+          [disabled]="loading()"
+        >
+          @if (loading()) {
+            <span class="inline-block w-4 h-4 border-2 border-[#fdfaf5]/40 border-t-[#fdfaf5] rounded-full animate-spin"></span>
+            Sending…
+          } @else {
+            <span>Send my code</span>
+            <span>→</span>
+          }
+        </button>
+
+      </div>
+    }
+
+    <!-- ── Step: Verify Token ───────────────────────── -->
+    @if (step() === 'verify') {
+      <div class="stagger flex flex-col gap-5">
+
+        <div class="animate-fade-in-up">
+          <h2 class="font-display text-xl font-semibold text-[#3d2a1e]">
+            Check your inbox
+          </h2>
+          @if (successMsg()) {
+            <p class="text-[#5f8263] text-xs mt-1 font-body">{{ successMsg() }}</p>
+          } @else {
+            <p class="text-[#7a5c45] text-xs mt-1 font-body">
+              Enter the 6-digit code we sent to <strong>{{ email }}</strong>.
+            </p>
+          }
+        </div>
+
+        <div class="animate-fade-in-up">
+          <label class="label-cozy">Your 6-digit code</label>
+          <input
+            class="input-cozy text-center tracking-[0.5em] text-xl font-mono"
+            type="text"
+            inputmode="numeric"
+            maxlength="6"
+            placeholder="· · · · · ·"
+            [(ngModel)]="token"
+            (keydown.enter)="onVerify()"
+            autocomplete="one-time-code"
+          />
+        </div>
+
+        @if (error()) {
+          <p class="text-[#a85f5f] text-xs font-body animate-fade-in bg-[#a85f5f]/10 rounded-xl px-3 py-2">
+            {{ error() }}
+          </p>
+        }
+
+        <button
+          class="btn-primary animate-fade-in-up"
+          (click)="onVerify()"
+          [disabled]="loading()"
+        >
+          @if (loading()) {
+            <span class="inline-block w-4 h-4 border-2 border-[#fdfaf5]/40 border-t-[#fdfaf5] rounded-full animate-spin"></span>
+            Verifying…
+          } @else {
+            <span>Verify & enter</span>
+            <span>→</span>
+          }
+        </button>
+
+        <button class="btn-ghost text-sm" (click)="goBack()">
+          ← Use a different email
+        </button>
+
+      </div>
+    }
+
+  </div>
+
+  <p class="text-[#b89c85] text-xs font-body mt-8 animate-fade-in">
+    No passwords. No fuss. Just cozy tracking. 🌿
+  </p>
+
+</div>

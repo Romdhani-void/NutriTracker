@@ -1,0 +1,190 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Variables ────────────────────────────────────────────── */
+:root {
+  --bg-base:       #fdfaf5;
+  --bg-card:       #faf3e7;
+  --border-warm:   #e8cfa8;
+  --text-primary:  #3d2a1e;
+  --text-muted:    #7a5c45;
+  --text-faint:    #b89c85;
+  --accent:        #b05c3a;
+  --accent-hover:  #8f4a2d;
+  --green:         #5f8263;
+  --red:           #a85f5f;
+}
+
+/* ─── Base ─────────────────────────────────────────────────────── */
+html, body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Lora', Georgia, serif;
+  min-height: 100vh;
+}
+
+/* Subtle paper texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Typography ───────────────────────────────────────────────── */
+h1, h2, h3, h4 {
+  font-family: 'Playfair Display', Georgia, serif;
+  color: var(--text-primary);
+}
+
+/* ─── Component Layer ──────────────────────────────────────────── */
+@layer components {
+
+  /* Card */
+  .card {
+    @apply bg-[#faf3e7] border border-[#e8cfa8] rounded-3xl shadow-warm p-6;
+    position: relative;
+    z-index: 1;
+  }
+
+  .card-sm {
+    @apply bg-[#faf3e7] border border-[#e8cfa8] rounded-2xl shadow-warm-sm p-4;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           bg-[#b05c3a] hover:bg-[#8f4a2d]
+           text-[#fdfaf5] font-body font-medium
+           px-6 py-3 rounded-2xl
+           transition-all duration-200
+           shadow-warm-sm hover:shadow-warm;
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           border border-[#e8cfa8] hover:border-[#d9b080]
+           text-[#7a5c45] hover:text-[#3d2a1e]
+           bg-transparent hover:bg-[#faf3e7]
+           font-body font-medium
+           px-6 py-3 rounded-2xl
+           transition-all duration-200;
+  }
+
+  /* Input */
+  .input-cozy {
+    @apply w-full bg-[#fdfaf5] border border-[#e8cfa8]
+           focus:border-[#c8925a] focus:ring-2 focus:ring-[#c8925a]/20
+           rounded-xl px-4 py-3
+           text-[#3d2a1e] placeholder-[#b89c85]
+           font-body text-sm
+           outline-none transition-all duration-200;
+  }
+
+  /* Select */
+  .select-cozy {
+    @apply input-cozy appearance-none cursor-pointer;
+  }
+
+  /* Label */
+  .label-cozy {
+    @apply block text-xs font-display font-semibold uppercase tracking-widest
+           text-[#7a5c45] mb-1.5;
+  }
+
+  /* Status pill */
+  .status-met {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full
+           bg-[#5f8263]/15 text-[#5f8263] text-xs font-medium;
+  }
+
+  .status-not-met {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full
+           bg-[#a85f5f]/15 text-[#a85f5f] text-xs font-medium;
+  }
+
+  .status-pending {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full
+           bg-[#b89c85]/20 text-[#7a5c45] text-xs font-medium;
+  }
+
+  /* Divider */
+  .divider {
+    @apply border-t border-[#e8cfa8] my-4;
+  }
+
+  /* Page wrapper */
+  .page-wrapper {
+    @apply min-h-screen relative z-10 px-4 py-8;
+  }
+
+  /* Section title */
+  .section-title {
+    @apply font-display text-2xl font-semibold text-[#3d2a1e] mb-1;
+  }
+
+  .section-subtitle {
+    @apply font-body text-sm text-[#7a5c45] mb-6;
+  }
+}
+
+/* ─── Animations ───────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease both;
+}
+
+/* Staggered children */
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 80ms; }
+.stagger > *:nth-child(3) { animation-delay: 160ms; }
+.stagger > *:nth-child(4) { animation-delay: 240ms; }
+.stagger > *:nth-child(5) { animation-delay: 320ms; }
+
+/* Progress bar fill */
+.progress-fill {
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Skeleton loading */
+.skeleton {
+  background: linear-gradient(90deg, #f4e4cc 25%, #faf3e7 50%, #f4e4cc 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
