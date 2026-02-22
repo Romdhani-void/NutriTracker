@@ -1,0 +1,79 @@
+# To be installed 
+#  frontend - daily log service - goal service - user service
+
+name: nutri-track
+version: '3.8'
+services:
+  mongo:
+    image: mongo:latest
+    container_name: mongo-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=example
+  
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    depends_on:
+      - mongo
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://root:example@mongo:27017/
+      ME_CONFIG_BASICAUTH_ENABLED: true
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+  
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - daily-log-service
+      - goal-service
+      - user-service
+      - mongo
+  
+  daily-log-service:
+    build: ./backend/daily-log-service
+    container_name: daily-log-service
+    ports:
+      - "3003:3003"
+    environment:
+      - MONGO_URI=mongodb://root:example@mongo:27017/cozy-calories-logs?authSource=admin
+      - GOAL_SERVICE_URL=http://goal-service:3002
+    depends_on:
+      - mongo
+
+  goal-service:
+    build: ./backend/goal-service
+    container_name: goal-service
+    ports:
+      - "3002:3002"
+    environment:
+      - MONGO_URI=mongodb://root:example@mongo:27017/cozy-calories-goals?authSource=admin
+    depends_on:
+      - mongo
+
+  user-service:
+    build: ./backend/user-service
+    container_name: user-service
+    ports:
+      - "3001:3001"
+    environment:
+      - MONGO_URI=mongodb://root:example@mongo:27017/cozy-calories-users?authSource=admin
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=romdhanimohamedali06@gmail.com
+      - SMTP_PASS=xqtm mjbp zjwm lfgg
+      - EMAIL_FROM=Cozy Calories <romdhanimohamedali06@gmail.com>
+    depends_on:
+      - mongo
+
+volumes:
+  mongo_data:
