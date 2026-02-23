@@ -1,0 +1,101 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: ["devOps"]
+  pull_request:
+    branches: ["devOps"]
+
+jobs:
+  # backend validation
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: |
+          cd backend/user-service
+          npm install 
+          cd ../goal-service
+          npm install 
+          cd ../daily-log-service
+          npm install
+
+  # frontend validation
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies & build frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+  # Docker push
+
+  docker-push:
+    needs: ["backend", "frontend"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/nutri-track-frontend:latest
+            ${{ secrets.DOCKER_USERNAME }}/nutri-track-frontend:${{ github.run_number }}
+
+      - name: push daily-log-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/daily-log-service
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/nutri-track-daily-log-service:latest
+            ${{ secrets.DOCKER_USERNAME }}/nutri-track-daily-log-service:${{ github.run_number }}
+
+      - name: push goal-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/goal-service
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/nutri-track-goal-service:latest
+            ${{ secrets.DOCKER_USERNAME }}/nutri-track-goal-service:${{ github.run_number }}
+
+      - name: push user-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/user-service
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/nutri-track-user-service:latest
+            ${{ secrets.DOCKER_USERNAME }}/nutri-track-user-service:${{ github.run_number }}
