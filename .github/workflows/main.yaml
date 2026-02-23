@@ -4,7 +4,7 @@ on:
   push:
     branches: ["devOps"]
   pull_request:
-    branches: ["main"]
+    branches: ["devOps"]
 
 jobs:
   # backend validation
