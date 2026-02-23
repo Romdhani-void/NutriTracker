@@ -70,8 +70,8 @@ jobs:
           context: ./frontend
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-frontend:latest
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-frontend:${{ github.run_number }}
+            romdhani01/nutri-track-frontend:latest
+            romdhani01/nutri-track-frontend:${{ github.run_number }}
 
       - name: push daily-log-service
         uses: docker/build-push-action@v5
@@ -79,8 +79,8 @@ jobs:
           context: ./backend/daily-log-service
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-daily-log-service:latest
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-daily-log-service:${{ github.run_number }}
+            romdhani01/nutri-track-daily-log-service:latest
+            romdhani01/nutri-track-daily-log-service:${{ github.run_number }}
 
       - name: push goal-service
         uses: docker/build-push-action@v5
@@ -88,8 +88,8 @@ jobs:
           context: ./backend/goal-service
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-goal-service:latest
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-goal-service:${{ github.run_number }}
+            romdhani01/nutri-track-goal-service:latest
+            romdhani01/nutri-track-goal-service:${{ github.run_number }}
 
       - name: push user-service
         uses: docker/build-push-action@v5
@@ -97,5 +97,5 @@ jobs:
           context: ./backend/user-service
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-user-service:latest
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-user-service:${{ github.run_number }}
+            romdhani01/nutri-track-user-service:latest
+            romdhani01/nutri-track-user-service:${{ github.run_number }}
