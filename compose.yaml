@@ -28,7 +28,7 @@ services:
       ME_CONFIG_BASICAUTH_PASSWORD: admin
   
   frontend:
-    build: ./frontend
+    image: romdhani01/nutri-track-frontend:latest
     container_name: frontend
     ports:
       - "80:80"
@@ -39,7 +39,7 @@ services:
       - mongo
   
   daily-log-service:
-    build: ./backend/daily-log-service
+    image: romdhani01/nutri-track-daily-log-service:latest
     container_name: daily-log-service
     ports:
       - "3003:3003"
@@ -50,7 +50,7 @@ services:
       - mongo
 
   goal-service:
-    build: ./backend/goal-service
+    image: romdhani01/nutri-track-goal-service:latest
     container_name: goal-service
     ports:
       - "3002:3002"
@@ -60,7 +60,7 @@ services:
       - mongo
 
   user-service:
-    build: ./backend/user-service
+    image: romdhani01/nutri-track-user-service:latest
     container_name: user-service
     ports:
       - "3001:3001"
