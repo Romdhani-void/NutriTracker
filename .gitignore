@@ -1,4 +1,4 @@
-# OS
+﻿# OS
 .DS_Store
 Thumbs.db
 
@@ -13,7 +13,7 @@ pnpm-debug.log*
 .env
 *.env
 
-# Angular / frontend build
+# Angular / frontend build output
 frontend/dist/
 frontend/.angular/
 frontend/.cache/
@@ -21,6 +21,9 @@ frontend/.cache/
 # Logs
 *.log
 
-# IDE
+# IDE / editor
 .vscode/
 .idea/
+
+# Docker compose local override (optional)
+# docker-compose.override.yml
