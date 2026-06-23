@@ -147,8 +147,8 @@ export class DashboardComponent implements OnInit {
 
   getProgressColor(): string {
     const pct = this.progressPercent();
-    if (pct >= 100) return '#5f8263';
-    if (pct >= 75)  return '#c8925a';
-    return '#b05c3a';
+    if (pct >= 100) return '#22c55e';
+    if (pct >= 75)  return '#4ade80';
+    return '#86efac';
   }
 }

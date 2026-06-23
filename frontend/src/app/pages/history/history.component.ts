@@ -70,9 +70,9 @@ export class HistoryComponent implements OnInit {
   }
 
   getBarColor(log: HistorySummary): string {
-    if (log.goalStatus === 'met')     return '#5f8263';
-    if (log.goalStatus === 'not_met') return '#a85f5f';
-    return '#b89c85';
+    if (log.goalStatus === 'met')     return '#22c55e';
+    if (log.goalStatus === 'not_met') return '#ef4444';
+    return '#94a89c';
   }
 
   formatDate(dateStr: string): string {
