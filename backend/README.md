@@ -5,7 +5,7 @@ A minimal, cozy calorie tracking app built with a microservices architecture.
 ## Architecture
 
 ```
-cozy-calories/
+Nutri-Track/
 ├── user-service/        # Port 3001 — Auth, email tokens, user profiles
 ├── goal-service/        # Port 3002 — Body details & calorie goal calculation
 ├── daily-log-service/   # Port 3003 — Daily food logging & goal status
