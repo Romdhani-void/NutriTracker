@@ -1,0 +1,46 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nutri-track-ingress
+  annotations:
+    {{- range $key, $value := .Values.ingress.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host }}
+      {{- end }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.paths.frontend }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.frontend.service.name }}
+                port:
+                  number: {{ .Values.frontend.service.port }}
+          - path: {{ .Values.ingress.paths.userService }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.userService.service.name }}
+                port:
+                  number: {{ .Values.userService.service.port }}
+          - path: {{ .Values.ingress.paths.goalService }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.goalService.service.name }}
+                port:
+                  number: {{ .Values.goalService.service.port }}
+          - path: {{ .Values.ingress.paths.dailyLogService }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.dailyLog.service.name }}
+                port:
+                  number: {{ .Values.dailyLog.service.port }}
+{{- end }}

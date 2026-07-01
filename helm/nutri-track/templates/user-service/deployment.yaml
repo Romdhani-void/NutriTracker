@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.userService.name }}
+  labels:
+    app: {{ .Values.userService.name }}
+spec:
+  replicas: {{ .Values.userService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.userService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.userService.name }}
+    spec:
+      containers:
+        - name: {{ .Values.userService.name }}
+          image: {{- if .Values.global.imageRegistry }} {{ printf "%s/%s:%s" .Values.global.imageRegistry .Values.userService.image.repository .Values.userService.image.tag | quote }} {{- else }} {{ printf "%s:%s" .Values.userService.image.repository .Values.userService.image.tag | quote }} {{- end }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.userService.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.userService.name }}-secret
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20

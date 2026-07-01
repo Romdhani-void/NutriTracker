@@ -1,0 +1,110 @@
+global:
+  imageRegistry: "566167302576.dkr.ecr.eu-central-1.amazonaws.com"
+  imagePullPolicy: IfNotPresent
+  namespace: nutri-track
+
+mongo:
+  enabled: true
+  name: mongo
+  image:
+    repository: nutritracker-mongo
+    tag: "v1"
+  port: 27017
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: gp2
+  auth:
+    rootUsername: admin
+    rootPassword: adminPassword
+  service:
+    name: mongo
+    port: 27017
+    targetPort: 27017
+    type: ClusterIP
+
+frontend:
+  name: nutri-track
+  replicas: 1
+  image:
+    repository: nutritracker-frontend
+    tag: v1
+  service:
+    name: nutri-track-frontend-service
+    port: 80
+    targetPort: 80
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+userService:
+  name: user-service
+  replicas: 1
+  image:
+    repository: nutritracker-backend
+    tag: user-service-v1
+  port: 3001
+  service:
+    name: user-service
+    port: 3001
+    targetPort: 3001
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+  env:
+    MONGO_URI: "mongodb://admin:adminPassword@mongo:27017/cozy-calories-users?authSource=admin"
+    TOKEN_EXPIRY_MINUTES: "15"
+    SMTP_HOST: smtp.gmail.com
+    SMTP_PORT: "587"
+    SMTP_USER: Romdhanimohamedali06@gmail.com
+    SMTP_PASS: zndkzhbcyeieqwlu
+    EMAIL_FROM: Romdhanimohamedali06@gmail.com
+
+goalService:
+  name: goal-service
+  replicas: 1
+  image:
+    repository: nutritracker-backend
+    tag: goal-service-v1
+  port: 3002
+  service:
+    name: goal-service
+    port: 3002
+    targetPort: 3002
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+  env:
+    MONGO_URI: "mongodb://admin:adminPassword@mongo:27017/cozy-calories-goals?authSource=admin"
+
+dailyLog:
+  name: daily-log-service
+  replicas: 1
+  image:
+    repository: nutritracker-backend
+    tag: daily-log-service-v1
+  port: 3003
+  service:
+    name: daily-log-service
+    port: 3003
+    targetPort: 3003
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+  env:
+    MONGO_URI: "mongodb://admin:adminPassword@mongo:27017/cozy-calories-logs?authSource=admin"
+    GOAL_SERVICE_URL: "http://goal-service:3002"
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+  host: ""
+  paths:
+    frontend: /
+    userService: /users
+    goalService: /goals
+    dailyLogService: /logs

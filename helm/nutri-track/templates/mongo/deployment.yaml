@@ -1,0 +1,57 @@
+{{- if .Values.mongo.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.mongo.name }}
+  labels:
+    app: {{ .Values.mongo.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Values.mongo.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.mongo.name }}
+    spec:
+      containers:
+        - name: mongo
+          image: {{- if .Values.global.imageRegistry }} {{ printf "%s/%s:%s" .Values.global.imageRegistry .Values.mongo.image.repository .Values.mongo.image.tag | quote }} {{- else }} {{ printf "%s:%s" .Values.mongo.image.repository .Values.mongo.image.tag | quote }} {{- end }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: mongo
+              containerPort: {{ .Values.mongo.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.mongo.name }}-secret
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: mongo-data
+          {{- if .Values.mongo.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.mongo.name }}-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

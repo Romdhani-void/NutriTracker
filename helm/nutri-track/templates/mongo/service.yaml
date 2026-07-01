@@ -1,0 +1,16 @@
+{{- if .Values.mongo.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.mongo.service.name }}
+  labels:
+    app: {{ .Values.mongo.name }}
+spec:
+  type: {{ .Values.mongo.service.type | default "ClusterIP" }}
+  selector:
+    app: {{ .Values.mongo.name }}
+  ports:
+    - name: mongo
+      port: {{ .Values.mongo.service.port }}
+      targetPort: {{ .Values.mongo.service.targetPort }}
+{{- end }}
