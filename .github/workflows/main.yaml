@@ -6,19 +6,19 @@ on:
   pull_request:
     branches: ["devOps"]
 
+permissions:
+  contents: write
+
 jobs:
-  # backend validation
   backend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Install dependencies
         run: |
           cd backend/user-service
@@ -28,25 +28,21 @@ jobs:
           cd ../daily-log-service
           npm install
 
-  # frontend validation
   frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Install dependencies & build frontend
         run: |
           cd frontend
           npm install
           npm run build
 
-  # ECR push
   ecr-push:
     needs: ["backend", "frontend"]
     runs-on: ubuntu-latest
@@ -98,4 +94,5 @@ jobs:
           context: ./backend/user-service
           push: true
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/nutritracker-user-service-dev:1.0.${{ github.run_number }}
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-user-service:latest
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-user-service:1.0.${{ github.run_number }}
