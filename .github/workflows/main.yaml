@@ -7,7 +7,7 @@ on:
     branches: ["devOps"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   backend:
@@ -96,18 +96,33 @@ jobs:
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/nutritracker-user-service-dev:1.0.${{ github.run_number }}
 
-      - name: Update Helm values with new image tags
-        run: |
-          sudo snap install yq
-          yq -i '.frontend.image.tag = "1.0.${{ github.run_number }}"' helm/nutri-track/values-dev.yaml
-          yq -i '.userService.image.tag = "1.0.${{ github.run_number }}"' helm/nutri-track/values-dev.yaml
-          yq -i '.goalService.image.tag = "1.0.${{ github.run_number }}"' helm/nutri-track/values-dev.yaml
-          yq -i '.dailyLog.image.tag = "1.0.${{ github.run_number }}"' helm/nutri-track/values-dev.yaml
+  deploy:
+    needs: ["ecr-push"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Commit and push updated Helm values
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name nutri-eks-cluster --region eu-central-1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy with Helm
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add helm/nutri-track/values-dev.yaml
-          git commit -m "Update image tags to 1.0.${{ github.run_number }} [skip ci]"
-          git push
+          helm upgrade --install nutri-track helm/nutri-track \
+            -f helm/nutri-track/values-dev.yaml \
+            --set frontend.image.tag=1.0.${{ github.run_number }} \
+            --set userService.image.tag=1.0.${{ github.run_number }} \
+            --set goalService.image.tag=1.0.${{ github.run_number }} \
+            --set dailyLog.image.tag=1.0.${{ github.run_number }} \
+            --namespace nutri-track \
+            --create-namespace
