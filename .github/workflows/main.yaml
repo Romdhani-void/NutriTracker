@@ -142,6 +142,7 @@ jobs:
       - name: Wait for External Secrets Operator to be ready
         run: |
           kubectl rollout status deployment/external-secrets -n external-secrets --timeout=120s
+          kubectl rollout status deployment/external-secrets-webhook -n external-secrets --timeout=120s
 
       - name: Apply ClusterSecretStore
         run: kubectl apply -f helm/controllers/cluster-secret-store.yaml
