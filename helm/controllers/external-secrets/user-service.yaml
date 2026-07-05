@@ -1,0 +1,16 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: user-service-secret
+  namespace: nutri-track
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: user-service-secret
+    creationPolicy: Owner
+  dataFrom:
+    - extract:
+        key: nutritracker/dev/user-service

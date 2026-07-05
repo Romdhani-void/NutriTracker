@@ -1,0 +1,16 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: mongo-secret
+  namespace: nutri-track
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: mongo-secret
+    creationPolicy: Owner
+  dataFrom:
+    - extract:
+        key: nutritracker/dev/mongo

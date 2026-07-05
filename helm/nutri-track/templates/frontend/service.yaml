@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.frontend.service.name }}
+  labels:
+    app: {{ .Values.frontend.service.name }}
+spec:
+  type: {{ .Values.frontend.service.type | default "ClusterIP" }}
+  ports:
+    - name: {{ .Values.frontend.service.portName | default "http" }}
+      protocol: {{ .Values.frontend.service.protocol | default "TCP" }}
+      port: {{ .Values.frontend.service.port }}
+      targetPort: {{ .Values.frontend.service.targetPort }}
+  selector:
+    app: {{ .Values.frontend.name }}-frontend

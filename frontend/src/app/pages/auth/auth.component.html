@@ -1,28 +1,28 @@
-<div class="page-wrapper flex flex-col items-center justify-center min-h-screen">
+<div class="hero-bg page-wrapper-centered">
 
-  <!-- Hero mark -->
-  <div class="animate-fade-in-up mb-8 text-center">
-    <div class="text-6xl mb-4 select-none">🫖</div>
-    <h1 class="font-display text-4xl font-semibold text-[#3d2a1e] leading-tight">
-      Cozy Calories
+  <!-- Hero -->
+  <div class="animate-fade-in-up mb-8 text-center max-w-sm">
+    <div class="logo-mark mx-auto mb-5 text-lg">N</div>
+    <h1 class="font-display text-4xl font-bold text-ink leading-tight tracking-tight">
+      NutriTrack
     </h1>
-    <p class="font-body text-[#7a5c45] mt-2 text-sm italic">
-      Simple, warm, daily calorie tracking.
+    <p class="font-body text-ink-muted mt-3 text-sm leading-relaxed">
+      Build healthy habits you'll love to keep. Simple daily calorie tracking.
     </p>
   </div>
 
   <!-- Card -->
-  <div class="card w-full max-w-sm animate-scale-in">
+  <div class="card w-full max-w-sm animate-scale-in shadow-soft-lg">
 
     <!-- ── Step: Register ───────────────────────────── -->
     @if (step() === 'register') {
       <div class="stagger flex flex-col gap-5">
 
         <div class="animate-fade-in-up">
-          <h2 class="font-display text-xl font-semibold text-[#3d2a1e]">
-            Start tracking
+          <h2 class="font-display text-xl font-bold text-ink tracking-tight">
+            Get started
           </h2>
-          <p class="text-[#7a5c45] text-xs mt-1 font-body">
+          <p class="text-ink-muted text-sm mt-1.5 font-body leading-relaxed">
             Enter your email and we'll send you a one-time code to log in.
           </p>
         </div>
@@ -52,18 +52,16 @@
         </div>
 
         @if (error()) {
-          <p class="text-[#a85f5f] text-xs font-body animate-fade-in bg-[#a85f5f]/10 rounded-xl px-3 py-2">
-            {{ error() }}
-          </p>
+          <p class="alert-error animate-fade-in">{{ error() }}</p>
         }
 
         <button
-          class="btn-primary animate-fade-in-up"
+          class="btn-primary animate-fade-in-up w-full"
           (click)="onRegister()"
           [disabled]="loading()"
         >
           @if (loading()) {
-            <span class="inline-block w-4 h-4 border-2 border-[#fdfaf5]/40 border-t-[#fdfaf5] rounded-full animate-spin"></span>
+            <span class="spinner"></span>
             Sending…
           } @else {
             <span>Send my code</span>
@@ -79,14 +77,14 @@
       <div class="stagger flex flex-col gap-5">
 
         <div class="animate-fade-in-up">
-          <h2 class="font-display text-xl font-semibold text-[#3d2a1e]">
+          <h2 class="font-display text-xl font-bold text-ink tracking-tight">
             Check your inbox
           </h2>
           @if (successMsg()) {
-            <p class="text-[#5f8263] text-xs mt-1 font-body">{{ successMsg() }}</p>
+            <p class="alert-success mt-2">{{ successMsg() }}</p>
           } @else {
-            <p class="text-[#7a5c45] text-xs mt-1 font-body">
-              Enter the 6-digit code we sent to <strong>{{ email }}</strong>.
+            <p class="text-ink-muted text-sm mt-1.5 font-body leading-relaxed">
+              Enter the 6-digit code we sent to <strong class="text-ink">{{ email }}</strong>.
             </p>
           }
         </div>
@@ -106,18 +104,16 @@
         </div>
 
         @if (error()) {
-          <p class="text-[#a85f5f] text-xs font-body animate-fade-in bg-[#a85f5f]/10 rounded-xl px-3 py-2">
-            {{ error() }}
-          </p>
+          <p class="alert-error animate-fade-in">{{ error() }}</p>
         }
 
         <button
-          class="btn-primary animate-fade-in-up"
+          class="btn-primary animate-fade-in-up w-full"
           (click)="onVerify()"
           [disabled]="loading()"
         >
           @if (loading()) {
-            <span class="inline-block w-4 h-4 border-2 border-[#fdfaf5]/40 border-t-[#fdfaf5] rounded-full animate-spin"></span>
+            <span class="spinner"></span>
             Verifying…
           } @else {
             <span>Verify & enter</span>
@@ -125,7 +121,7 @@
           }
         </button>
 
-        <button class="btn-ghost text-sm" (click)="goBack()">
+        <button class="btn-ghost text-sm w-full" (click)="goBack()">
           ← Use a different email
         </button>
 
@@ -134,8 +130,8 @@
 
   </div>
 
-  <p class="text-[#b89c85] text-xs font-body mt-8 animate-fade-in">
-    No passwords. No fuss. Just cozy tracking. 🌿
+  <p class="text-ink-faint text-xs font-body mt-8 animate-fade-in">
+    No passwords. Just simple, secure tracking.
   </p>
 
 </div>

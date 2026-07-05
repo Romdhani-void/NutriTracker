@@ -1,0 +1,94 @@
+global:
+  imageRegistry: ""
+  imagePullPolicy: IfNotPresent
+  namespace: nutri-track
+
+mongo:
+  enabled: true
+  name: mongo
+  image:
+    repository: mongo
+    tag: "7"
+  port: 27017
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: ""
+  service:
+    name: mongo
+    port: 27017
+    targetPort: 27017
+    type: ClusterIP
+
+frontend:
+  name: nutri-track
+  replicas: 1
+  image:
+    repository: nutri-track-frontend
+    tag: latest
+  service:
+    name: nutri-track-frontend-service
+    port: 80
+    targetPort: 80
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+userService:
+  name: user-service
+  replicas: 1
+  image:
+    repository: nutri-track-user-service
+    tag: latest
+  port: 3001
+  service:
+    name: user-service
+    port: 3001
+    targetPort: 3001
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+goalService:
+  name: goal-service
+  replicas: 1
+  image:
+    repository: nutri-track-goal-service
+    tag: latest
+  port: 3002
+  service:
+    name: goal-service
+    port: 3002
+    targetPort: 3002
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+dailyLog:
+  name: daily-log-service
+  replicas: 1
+  image:
+    repository: nutri-track-daily-log-service
+    tag: latest
+  port: 3003
+  service:
+    name: daily-log-service
+    port: 3003
+    targetPort: 3003
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+ingress:
+  enabled: false
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+  host: ""
+  paths:
+    frontend: /
+    userService: /users
+    goalService: /goals
+    dailyLogService: /logs

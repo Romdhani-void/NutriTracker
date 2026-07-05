@@ -4,48 +4,57 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        parchment: {
-          50:  '#fdfaf5',
-          100: '#faf3e7',
-          200: '#f4e4cc',
-          300: '#e8cfa8',
-          400: '#d9b080',
-          500: '#c8925a',
+        surface: {
+          DEFAULT: '#ffffff',
+          base:    '#f6f8f7',
+          muted:   '#eef2f0',
+          hover:   '#f0f4f2',
         },
-        terracotta: {
-          400: '#c4704f',
-          500: '#b05c3a',
-          600: '#8f4a2d',
+        ink: {
+          DEFAULT: '#1a2e22',
+          muted:   '#5f7167',
+          faint:   '#94a89c',
         },
-        bark: {
-          700: '#5a3e2b',
-          800: '#3d2a1e',
-          900: '#261a12',
+        brand: {
+          DEFAULT: '#22c55e',
+          hover:   '#16a34a',
+          light:   '#dcfce7',
+          muted:   '#bbf7d0',
         },
-        sage: {
-          400: '#7a9e7e',
-          500: '#5f8263',
+        line: {
+          DEFAULT: '#e5ebe8',
+          focus:   '#86efac',
         },
-        dustyrose: {
-          400: '#c97b7b',
-          500: '#a85f5f',
-        }
+        success: {
+          DEFAULT: '#22c55e',
+          light:   '#dcfce7',
+        },
+        danger: {
+          DEFAULT: '#ef4444',
+          light:   '#fee2e2',
+        },
+        warning: {
+          DEFAULT: '#f59e0b',
+          light:   '#fef3c7',
+        },
       },
       fontFamily: {
-        display: ['"Playfair Display"', 'Georgia', 'serif'],
-        body:    ['"Lora"', 'Georgia', 'serif'],
+        display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        body:    ['"Inter"', 'system-ui', 'sans-serif'],
         mono:    ['"JetBrains Mono"', 'monospace'],
       },
       borderRadius: {
-        'xl':  '1rem',
-        '2xl': '1.5rem',
-        '3xl': '2rem',
+        'xl':  '0.875rem',
+        '2xl': '1.125rem',
+        '3xl': '1.5rem',
+        '4xl': '2rem',
       },
       boxShadow: {
-        'warm-sm': '0 2px 8px rgba(120, 70, 40, 0.10)',
-        'warm':    '0 4px 20px rgba(120, 70, 40, 0.15)',
-        'warm-lg': '0 8px 40px rgba(120, 70, 40, 0.20)',
-      }
+        'soft-sm': '0 1px 3px rgba(26, 46, 34, 0.04), 0 1px 2px rgba(26, 46, 34, 0.06)',
+        'soft':    '0 4px 16px rgba(26, 46, 34, 0.06), 0 2px 6px rgba(26, 46, 34, 0.04)',
+        'soft-lg': '0 12px 40px rgba(26, 46, 34, 0.08), 0 4px 12px rgba(26, 46, 34, 0.04)',
+        'soft-xl': '0 20px 60px rgba(26, 46, 34, 0.10), 0 8px 20px rgba(26, 46, 34, 0.05)',
+      },
     },
   },
   plugins: [],

@@ -1,16 +1,19 @@
 <div class="page-wrapper max-w-lg mx-auto">
 
   <!-- ── Nav ─────────────────────────────────────────── -->
-  <nav class="flex items-center justify-between mb-8 animate-fade-in">
-    <div class="flex items-center gap-2">
-      <span class="text-2xl select-none">🫖</span>
-      <span class="font-display font-semibold text-[#3d2a1e]">
-        Hello, {{ user()?.displayName }}
-      </span>
+  <nav class="nav-bar animate-fade-in">
+    <div class="flex items-center gap-3">
+      <div class="logo-mark text-sm">N</div>
+      <div>
+        <p class="text-ink-faint text-xs font-body">Welcome back</p>
+        <span class="font-display font-semibold text-ink text-sm">
+          {{ user()?.displayName }}
+        </span>
+      </div>
     </div>
     <div class="flex items-center gap-2">
       <a routerLink="/history" class="btn-ghost text-xs px-3 py-2">
-        📅 History
+        History
       </a>
       <button class="btn-ghost text-xs px-3 py-2" (click)="logout()">
         Sign out
@@ -20,8 +23,8 @@
 
   <!-- ── Date header ──────────────────────────────────── -->
   <div class="mb-6 animate-fade-in-up">
-    <p class="text-[#b89c85] text-xs font-body uppercase tracking-widest">Today</p>
-    <h1 class="font-display text-2xl font-semibold text-[#3d2a1e]">{{ today }}</h1>
+    <p class="text-ink-faint text-xs font-body font-semibold uppercase tracking-wider">Today</p>
+    <h1 class="font-display text-2xl font-bold text-ink tracking-tight mt-1">{{ today }}</h1>
   </div>
 
   <!-- ── Loading skeleton ─────────────────────────────── -->
@@ -36,16 +39,16 @@
     <div class="flex flex-col gap-5 stagger">
 
       <!-- ── Calorie Progress Card ───────────────────── -->
-      <div class="card animate-fade-in-up">
+      <div class="card animate-fade-in-up shadow-soft">
         <div class="flex items-start justify-between mb-4">
           <div>
             <p class="label-cozy">Calories today</p>
             <div class="flex items-baseline gap-2">
-              <span class="font-display text-5xl font-semibold text-[#3d2a1e]">
+              <span class="font-display text-5xl font-bold text-ink tracking-tight">
                 {{ log()?.totalCalories ?? 0 }}
               </span>
               @if (log()?.dailyCalorieTarget) {
-                <span class="font-body text-[#7a5c45] text-sm">
+                <span class="font-body text-ink-muted text-sm">
                   / {{ log()!.dailyCalorieTarget }} kcal
                 </span>
               }
@@ -57,32 +60,32 @@
         <!-- Progress bar -->
         @if (log()?.dailyCalorieTarget) {
           <div class="mt-2">
-            <div class="w-full h-3 bg-[#f4e4cc] rounded-full overflow-hidden">
+            <div class="progress-track h-3">
               <div
                 class="h-full rounded-full progress-fill"
                 [style.width.%]="progressPercent()"
                 [style.background-color]="getProgressColor()"
               ></div>
             </div>
-            <div class="flex justify-between mt-1.5 text-xs font-body text-[#b89c85]">
+            <div class="flex justify-between mt-2 text-xs font-body text-ink-faint">
               <span>{{ progressPercent() }}% of daily goal</span>
               @if (remainingCalories()! > 0) {
                 <span>{{ remainingCalories() }} kcal remaining</span>
               } @else if (remainingCalories()! <= 0) {
-                <span class="text-[#5f8263]">Goal reached 🎉</span>
+                <span class="text-success font-semibold">Goal reached</span>
               }
             </div>
           </div>
         } @else {
-          <p class="text-[#b89c85] text-xs font-body italic mt-2">
+          <p class="text-ink-faint text-sm font-body mt-2">
             No calorie goal set.
-            <a routerLink="/onboarding" class="text-[#b05c3a] underline">Set it up →</a>
+            <a routerLink="/onboarding" class="text-brand font-semibold hover:text-brand-hover">Set it up →</a>
           </p>
         }
 
         <!-- Goal breakdown pill row -->
         @if (goal()) {
-          <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-[#e8cfa8]">
+          <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-line">
             <span class="status-pending">BMR: {{ goal()!.bmr }} kcal</span>
             <span class="status-pending">TDEE: {{ goal()!.tdee }} kcal</span>
             <span class="status-pending capitalize">Goal: {{ goal()!.goalType }}</span>
@@ -91,8 +94,8 @@
       </div>
 
       <!-- ── Add Food Card ───────────────────────────── -->
-      <div class="card animate-fade-in-up">
-        <h2 class="font-display text-lg font-semibold mb-4">Log a food</h2>
+      <div class="card animate-fade-in-up shadow-soft">
+        <h2 class="font-display text-lg font-bold tracking-tight mb-4">Log a food</h2>
 
         <div class="flex flex-col gap-3">
           <div>
@@ -118,18 +121,16 @@
           </div>
 
           @if (formError()) {
-            <p class="text-[#a85f5f] text-xs font-body bg-[#a85f5f]/10 rounded-xl px-3 py-2 animate-fade-in">
-              {{ formError() }}
-            </p>
+            <p class="alert-error animate-fade-in">{{ formError() }}</p>
           }
 
           <button
-            class="btn-primary"
+            class="btn-primary w-full"
             (click)="addFood()"
             [disabled]="addingFood()"
           >
             @if (addingFood()) {
-              <span class="inline-block w-4 h-4 border-2 border-[#fdfaf5]/40 border-t-[#fdfaf5] rounded-full animate-spin"></span>
+              <span class="spinner"></span>
               Adding…
             } @else {
               + Add food entry
@@ -139,41 +140,49 @@
       </div>
 
       <!-- ── Today's Food Log ───────────────────────── -->
-      <div class="card animate-fade-in-up">
-        <h2 class="font-display text-lg font-semibold mb-4">
+      <div class="card animate-fade-in-up shadow-soft">
+        <h2 class="font-display text-lg font-bold tracking-tight mb-4">
           Today's entries
-          <span class="text-[#b89c85] font-body font-normal text-sm ml-2">
+          <span class="text-ink-faint font-body font-normal text-sm ml-2">
             ({{ log()?.foodEntries?.length ?? 0 }})
           </span>
         </h2>
 
         @if (!log()?.foodEntries?.length) {
-          <div class="text-center py-8">
-            <div class="text-4xl mb-2 select-none">🍽️</div>
-            <p class="text-[#b89c85] text-sm font-body italic">Nothing logged yet today.</p>
-            <p class="text-[#b89c85] text-xs font-body mt-1">Add your first meal above.</p>
+          <div class="text-center py-10">
+            <div class="w-14 h-14 rounded-2xl bg-surface-muted flex items-center justify-center mx-auto mb-3">
+              <svg class="w-7 h-7 text-ink-faint" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182l.53-.435"/>
+              </svg>
+            </div>
+            <p class="text-ink-muted text-sm font-body">Nothing logged yet today.</p>
+            <p class="text-ink-faint text-xs font-body mt-1">Add your first meal above.</p>
           </div>
         } @else {
           <div class="flex flex-col gap-2">
             @for (entry of log()!.foodEntries; track entry._id) {
               <div
-                class="flex items-center justify-between py-3 px-4 rounded-2xl bg-[#fdfaf5] border border-[#e8cfa8] transition-all duration-200 animate-fade-in"
+                class="list-item animate-fade-in"
                 [class.opacity-50]="deletingId() === entry._id"
               >
-                <div class="flex items-center gap-3">
-                  <span class="text-lg select-none">🥘</span>
-                  <div>
-                    <div class="font-body text-sm text-[#3d2a1e] font-medium">{{ entry.name }}</div>
-                    <div class="text-[#b89c85] text-xs font-body">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-9 h-9 rounded-xl bg-brand-light flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4 text-brand" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  </div>
+                  <div class="min-w-0">
+                    <div class="font-body text-sm text-ink font-medium truncate">{{ entry.name }}</div>
+                    <div class="text-ink-faint text-xs font-body">
                       {{ entry.addedAt | date: 'h:mm a' }}
                     </div>
                   </div>
                 </div>
-                <div class="flex items-center gap-3">
-                  <span class="font-display font-semibold text-[#b05c3a]">{{ entry.calories }}</span>
-                  <span class="text-[#b89c85] text-xs">kcal</span>
+                <div class="flex items-center gap-3 shrink-0">
+                  <span class="font-display font-bold text-brand">{{ entry.calories }}</span>
+                  <span class="text-ink-faint text-xs">kcal</span>
                   <button
-                    class="w-7 h-7 rounded-full flex items-center justify-center text-[#b89c85] hover:text-[#a85f5f] hover:bg-[#a85f5f]/10 transition-all duration-200"
+                    class="w-8 h-8 rounded-full flex items-center justify-center text-ink-faint hover:text-danger hover:bg-danger-light transition-all duration-200 text-lg leading-none"
                     (click)="deleteFood(entry)"
                     [disabled]="deletingId() === entry._id"
                     title="Remove"
@@ -183,13 +192,13 @@
             }
 
             <!-- Total row -->
-            <div class="flex items-center justify-between pt-3 mt-1 border-t border-[#e8cfa8]">
-              <span class="font-display font-semibold text-sm text-[#7a5c45]">Total</span>
+            <div class="flex items-center justify-between pt-3 mt-1 border-t border-line">
+              <span class="font-display font-semibold text-sm text-ink-muted">Total</span>
               <div class="flex items-center gap-2">
-                <span class="font-display font-semibold text-[#3d2a1e] text-lg">
+                <span class="font-display font-bold text-ink text-lg">
                   {{ log()!.totalCalories }}
                 </span>
-                <span class="text-[#b89c85] text-xs">kcal</span>
+                <span class="text-ink-faint text-xs">kcal</span>
               </div>
             </div>
           </div>
@@ -197,9 +206,7 @@
       </div>
 
       @if (error()) {
-        <p class="text-[#a85f5f] text-xs font-body bg-[#a85f5f]/10 rounded-xl px-4 py-3 animate-fade-in">
-          {{ error() }}
-        </p>
+        <p class="alert-error px-4 py-3 animate-fade-in">{{ error() }}</p>
       }
 
     </div>

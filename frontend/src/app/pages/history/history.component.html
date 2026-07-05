@@ -1,13 +1,12 @@
 <div class="page-wrapper max-w-lg mx-auto">
 
   <!-- ── Nav ─────────────────────────────────────────── -->
-  <nav class="flex items-center justify-between mb-8 animate-fade-in">
+  <nav class="nav-bar animate-fade-in">
     <a routerLink="/dashboard" class="btn-ghost text-xs px-3 py-2">
       ← Back to today
     </a>
     <div class="flex items-center gap-2">
-      <span class="text-xl select-none">📅</span>
-      <span class="font-display font-semibold text-[#3d2a1e]">History</span>
+      <span class="font-display font-bold text-ink tracking-tight">History</span>
     </div>
   </nav>
 
@@ -28,46 +27,50 @@
       @if (logs().length > 0) {
         <div class="grid grid-cols-3 gap-3 animate-fade-in-up">
           <div class="card-sm text-center">
-            <div class="font-display text-2xl font-semibold text-[#3d2a1e]">{{ totalDays() }}</div>
-            <div class="text-[#7a5c45] text-xs font-body mt-1">Days logged</div>
+            <div class="font-display text-2xl font-bold text-ink">{{ totalDays() }}</div>
+            <div class="text-ink-muted text-xs font-body mt-1">Days logged</div>
           </div>
           <div class="card-sm text-center">
-            <div class="font-display text-2xl font-semibold text-[#5f8263]">{{ metCount() }}</div>
-            <div class="text-[#7a5c45] text-xs font-body mt-1">Goals met</div>
+            <div class="font-display text-2xl font-bold text-success">{{ metCount() }}</div>
+            <div class="text-ink-muted text-xs font-body mt-1">Goals met</div>
           </div>
           <div class="card-sm text-center">
-            <div class="font-display text-2xl font-semibold text-[#b05c3a]">{{ avgCalories() }}</div>
-            <div class="text-[#7a5c45] text-xs font-body mt-1">Avg kcal</div>
+            <div class="font-display text-2xl font-bold text-brand">{{ avgCalories() }}</div>
+            <div class="text-ink-muted text-xs font-body mt-1">Avg kcal</div>
           </div>
         </div>
       }
 
       <!-- ── Log list ───────────────────────────────── -->
-      <div class="card animate-fade-in-up">
-        <h2 class="font-display text-lg font-semibold mb-4 text-[#3d2a1e]">
+      <div class="card animate-fade-in-up shadow-soft">
+        <h2 class="font-display text-lg font-bold tracking-tight mb-4 text-ink">
           Past days
-          <span class="text-[#b89c85] font-body font-normal text-sm ml-2">(last 60)</span>
+          <span class="text-ink-faint font-body font-normal text-sm ml-2">(last 60)</span>
         </h2>
 
         @if (logs().length === 0) {
           <div class="text-center py-12">
-            <div class="text-5xl mb-3 select-none">📭</div>
-            <p class="font-display text-lg text-[#7a5c45]">No history yet</p>
-            <p class="text-[#b89c85] text-xs font-body mt-1 italic">
+            <div class="w-16 h-16 rounded-2xl bg-surface-muted flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-ink-faint" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <p class="font-display text-lg font-semibold text-ink-muted">No history yet</p>
+            <p class="text-ink-faint text-sm font-body mt-2">
               Start logging food and your history will appear here.
             </p>
-            <a routerLink="/dashboard" class="btn-primary inline-flex mt-4">
+            <a routerLink="/dashboard" class="btn-primary inline-flex mt-5">
               Go log something →
             </a>
           </div>
         } @else {
           <div class="flex flex-col gap-3">
             @for (log of logs(); track log.date) {
-              <div class="p-4 rounded-2xl bg-[#fdfaf5] border border-[#e8cfa8] animate-fade-in">
+              <div class="p-4 rounded-2xl bg-surface-base border border-line/80 animate-fade-in hover:shadow-soft-sm transition-shadow">
 
                 <!-- Row top: date + status -->
                 <div class="flex items-center justify-between mb-2">
-                  <span class="font-display font-semibold text-sm text-[#3d2a1e]">
+                  <span class="font-display font-semibold text-sm text-ink">
                     {{ formatDate(log.date) }}
                   </span>
                   <span [class]="getStatusClass(log.goalStatus)">
@@ -76,7 +79,7 @@
                 </div>
 
                 <!-- Progress bar -->
-                <div class="w-full h-2 bg-[#f4e4cc] rounded-full overflow-hidden mb-2">
+                <div class="progress-track h-2 mb-2">
                   <div
                     class="h-full rounded-full progress-fill"
                     [style.width.%]="getProgressWidth(log)"
@@ -85,9 +88,9 @@
                 </div>
 
                 <!-- Row bottom: calories -->
-                <div class="flex items-center justify-between text-xs font-body text-[#7a5c45]">
+                <div class="flex items-center justify-between text-xs font-body text-ink-muted">
                   <span>
-                    <strong class="font-display text-[#3d2a1e]">{{ log.totalCalories }}</strong> kcal consumed
+                    <strong class="font-display text-ink">{{ log.totalCalories }}</strong> kcal consumed
                   </span>
                   @if (log.dailyCalorieTarget) {
                     <span>goal: {{ log.dailyCalorieTarget }} kcal</span>
@@ -101,9 +104,7 @@
       </div>
 
       @if (error()) {
-        <p class="text-[#a85f5f] text-xs font-body bg-[#a85f5f]/10 rounded-xl px-4 py-3">
-          {{ error() }}
-        </p>
+        <p class="alert-error px-4 py-3">{{ error() }}</p>
       }
 
     </div>
