@@ -6,7 +6,6 @@ global:
   imageRegistry: "566167302576.dkr.ecr.eu-central-1.amazonaws.com"
   imagePullPolicy: IfNotPresent
   namespace: nutri-track
-
 mongo:
   enabled: true
   name: mongo
@@ -23,13 +22,12 @@ mongo:
     port: 27017
     targetPort: 27017
     type: ClusterIP
-
 frontend:
   name: nutri-track
   replicas: 1
   image:
     repository: nutritracker-frontend
-    tag: v1
+    tag: 1.0.14
   service:
     name: nutri-track-frontend-service
     port: 80
@@ -37,13 +35,12 @@ frontend:
     portName: http
     type: ClusterIP
     protocol: TCP
-
 userService:
   name: user-service
   replicas: 1
   image:
     repository: nutritracker-backend
-    tag: user-service-v1
+    tag: 1.0.14
   port: 3001
   service:
     name: user-service
@@ -52,13 +49,12 @@ userService:
     portName: http
     type: ClusterIP
     protocol: TCP
-
 goalService:
   name: goal-service
   replicas: 1
   image:
     repository: nutritracker-backend
-    tag: goal-service-v1
+    tag: 1.0.14
   port: 3002
   service:
     name: goal-service
@@ -67,13 +63,12 @@ goalService:
     portName: http
     type: ClusterIP
     protocol: TCP
-
 dailyLog:
   name: daily-log-service
   replicas: 1
   image:
     repository: nutritracker-backend
-    tag: daily-log-service-v1
+    tag: 1.0.14
   port: 3003
   service:
     name: daily-log-service
@@ -82,7 +77,6 @@ dailyLog:
     portName: http
     type: ClusterIP
     protocol: TCP
-
 ingress:
   enabled: true
   className: alb
