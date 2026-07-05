@@ -50,9 +50,6 @@ jobs:
   ecr-push:
     needs: ["backend", "frontend"]
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: eu-central-1
-      ECR_REGISTRY: 566167302576.dkr.ecr.eu-central-1.amazonaws.com
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -60,11 +57,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -76,8 +74,8 @@ jobs:
           context: ./frontend
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-frontend:latest
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-frontend:${{ github.run_number }}
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-frontend:latest
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-frontend:1.0.${{ github.run_number }}
 
       - name: Push daily-log-service
         uses: docker/build-push-action@v5
@@ -85,8 +83,8 @@ jobs:
           context: ./backend/daily-log-service
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-daily-log-service:latest
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-daily-log-service:${{ github.run_number }}
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-daily-log-service:latest
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-daily-log-service:1.0.${{ github.run_number }}
 
       - name: Push goal-service
         uses: docker/build-push-action@v5
@@ -94,8 +92,8 @@ jobs:
           context: ./backend/goal-service
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-goal-service:latest
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-goal-service:${{ github.run_number }}
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-goal-service:latest
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-goal-service:1.0.${{ github.run_number }}
 
       - name: Push user-service
         uses: docker/build-push-action@v5
@@ -103,5 +101,5 @@ jobs:
           context: ./backend/user-service
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-user-service:latest
-            ${{ secrets.DOCKER_USERNAME }}/nutri-track-user-service:${{ github.run_number }}
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-user-service:latest
+            ${{ steps.login-ecr.outputs.registry }}/nutri-track-user-service:1.0.${{ github.run_number }}
