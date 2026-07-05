@@ -11,8 +11,8 @@ mongo:
   enabled: true
   name: mongo
   image:
-    repository: nutritracker-mongodb-dev
-    tag: "v1"
+    repository: mongo
+    tag: "7"
   port: 27017
   persistence:
     enabled: true

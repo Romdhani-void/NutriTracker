@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: mongo
-          image: {{- if .Values.global.imageRegistry }} {{ printf "%s/%s:%s" .Values.global.imageRegistry .Values.mongo.image.repository .Values.mongo.image.tag | quote }} {{- else }} {{ printf "%s:%s" .Values.mongo.image.repository .Values.mongo.image.tag | quote }} {{- end }}
+          image: {{ printf "%s:%s" .Values.mongo.image.repository .Values.mongo.image.tag | quote }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: mongo
