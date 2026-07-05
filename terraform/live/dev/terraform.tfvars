@@ -41,3 +41,4 @@ node_max_size                       = 3
 node_min_size                       = 1
 enable_ebs_csi_driver               = true
 enable_aws_load_balancer_controller = true
+enable_external_secrets             = true

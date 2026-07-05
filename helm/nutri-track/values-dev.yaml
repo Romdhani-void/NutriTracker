@@ -1,3 +1,7 @@
+# Dev overrides (safe to commit — no credentials).
+# App secrets are synced from AWS Secrets Manager via External Secrets Operator.
+# Seed AWS first: scripts/bootstrap-aws-secrets.ps1 (or .sh)
+
 global:
   imageRegistry: "566167302576.dkr.ecr.eu-central-1.amazonaws.com"
   imagePullPolicy: IfNotPresent
@@ -14,9 +18,6 @@ mongo:
     enabled: true
     size: 5Gi
     storageClassName: gp2
-  auth:
-    rootUsername: admin
-    rootPassword: adminPassword
   service:
     name: mongo
     port: 27017
@@ -51,14 +52,6 @@ userService:
     portName: http
     type: ClusterIP
     protocol: TCP
-  env:
-    MONGO_URI: "mongodb://admin:adminPassword@mongo:27017/cozy-calories-users?authSource=admin"
-    TOKEN_EXPIRY_MINUTES: "15"
-    SMTP_HOST: smtp.gmail.com
-    SMTP_PORT: "587"
-    SMTP_USER: Romdhanimohamedali06@gmail.com
-    SMTP_PASS: zndkzhbcyeieqwlu
-    EMAIL_FROM: Romdhanimohamedali06@gmail.com
 
 goalService:
   name: goal-service
@@ -74,8 +67,6 @@ goalService:
     portName: http
     type: ClusterIP
     protocol: TCP
-  env:
-    MONGO_URI: "mongodb://admin:adminPassword@mongo:27017/cozy-calories-goals?authSource=admin"
 
 dailyLog:
   name: daily-log-service
@@ -91,9 +82,6 @@ dailyLog:
     portName: http
     type: ClusterIP
     protocol: TCP
-  env:
-    MONGO_URI: "mongodb://admin:adminPassword@mongo:27017/cozy-calories-logs?authSource=admin"
-    GOAL_SERVICE_URL: "http://goal-service:3002"
 
 ingress:
   enabled: true

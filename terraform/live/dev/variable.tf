@@ -8,6 +8,11 @@ variable "project_name" {
   type        = string
 }
 
+variable "environment" {
+  description = "Deployment environment (dev, staging, prod)"
+  type        = string
+}
+
 variable "image_tag_mutability" {
   description = "The tag mutability setting for the ECR repository"
   type        = string
@@ -77,4 +82,10 @@ variable "enable_ebs_csi_driver" {
 variable "enable_aws_load_balancer_controller" {
   description = "Whether to enable the AWS Load Balancer Controller"
   type        = bool
+}
+
+variable "enable_external_secrets" {
+  description = "Whether to create IRSA for External Secrets Operator"
+  type        = bool
+  default     = true
 }

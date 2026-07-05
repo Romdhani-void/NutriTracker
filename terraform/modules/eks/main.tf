@@ -119,3 +119,57 @@ resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
   policy_arn = aws_iam_policy.aws_load_balancer_controller[0].arn
   role       = aws_iam_role.aws_load_balancer_controller[0].name
 }
+
+data "aws_caller_identity" "current" {}
+
+// IRSA for External Secrets Operator
+resource "aws_iam_role" "external_secrets" {
+  count = var.enable_external_secrets ? 1 : 0
+  name  = "${var.cluster_name}-external-secrets-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:external-secrets:external-secrets"
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "external_secrets" {
+  count = var.enable_external_secrets ? 1 : 0
+
+  name        = "${var.cluster_name}-external-secrets-policy"
+  description = "Allow External Secrets Operator to read Secrets Manager secrets"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.secrets_manager_name_prefix}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "external_secrets" {
+  count      = var.enable_external_secrets ? 1 : 0
+  policy_arn = aws_iam_policy.external_secrets[0].arn
+  role       = aws_iam_role.external_secrets[0].name
+}

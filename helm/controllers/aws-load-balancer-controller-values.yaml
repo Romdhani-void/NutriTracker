@@ -8,4 +8,4 @@ serviceAccount:
 
 region: eu-central-1
 
-vpcId: "vpc-01b58459fb2e33c4d"
+vpcId: "vpc-04c87aeb450bd8a6f"

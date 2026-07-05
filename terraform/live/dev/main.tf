@@ -67,6 +67,9 @@ module "eks" {
 
   enable_ebs_csi_driver               = var.enable_ebs_csi_driver
   enable_aws_load_balancer_controller = var.enable_aws_load_balancer_controller
+  enable_external_secrets             = var.enable_external_secrets
+  aws_region                          = var.aws_region
+  secrets_manager_name_prefix         = "${lower(var.project_name)}/${var.environment}"
 
   depends_on = [module.iam]
 }

@@ -56,3 +56,20 @@ variable "enable_aws_load_balancer_controller" {
   description = "Whether to enable the AWS Load Balancer Controller"
   type        = bool
 }
+
+variable "enable_external_secrets" {
+  description = "Whether to create IRSA for External Secrets Operator"
+  type        = bool
+  default     = false
+}
+
+variable "aws_region" {
+  description = "AWS region (used in Secrets Manager IAM policy scope)"
+  type        = string
+}
+
+variable "secrets_manager_name_prefix" {
+  description = "Prefix for Secrets Manager secret names ESO is allowed to read"
+  type        = string
+  default     = "nutritracker/dev"
+}
