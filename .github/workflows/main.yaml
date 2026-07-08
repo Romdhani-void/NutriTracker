@@ -179,3 +179,23 @@ jobs:
           kubectl rollout status deployment/user-service -n nutri-track --timeout=120s
           kubectl rollout status deployment/goal-service -n nutri-track --timeout=120s
           kubectl rollout status deployment/daily-log-service -n nutri-track --timeout=120s
+
+      - name: Get application URL
+        run: |
+          echo "Waiting for ALB address to be assigned..."
+          for i in $(seq 1 30); do
+            URL=$(kubectl get ingress nutri-track-ingress -n nutri-track -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ -n "$URL" ]; then
+              break
+            fi
+            sleep 10
+          done
+
+          if [ -z "$URL" ]; then
+            echo "Timed out waiting for ALB address."
+            exit 1
+          fi
+
+          echo "Visit your app here: http://$URL"
+          echo "### 🚀 Deployment successful" >> "$GITHUB_STEP_SUMMARY"
+          echo "Visit your app here: [http://$URL](http://$URL)" >> "$GITHUB_STEP_SUMMARY"
