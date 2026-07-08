@@ -135,6 +135,11 @@ jobs:
             -f helm/controllers/aws-load-balancer-controller-values.yaml \
             --set vpcId=${{ steps.vpc.outputs.vpc_id }}
 
+      - name: Restart AWS Load Balancer Controller to refresh webhook cert
+        run: |
+          kubectl delete secret aws-load-balancer-webhook-tls -n kube-system --ignore-not-found
+          kubectl rollout restart deployment aws-load-balancer-controller -n kube-system
+
       - name: Wait for AWS Load Balancer Controller to be ready
         run: |
           kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=120s
