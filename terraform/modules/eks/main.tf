@@ -34,47 +34,8 @@ resource "aws_iam_openid_connect_provider" "eks" {
   thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
 }
 
-// IRSA for EBS CSI Driver
-resource "aws_iam_role" "ebs_csi_driver" {
-  count = var.enable_ebs_csi_driver ? 1 : 0
-  name = "${var.cluster_name}-ebs-csi-driver-role"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Federated = aws_iam_openid_connect_provider.eks.arn
-        }
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Condition = {
-          StringEquals = {
-            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
-            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
-}
-resource "aws_iam_role_policy_attachment" "ebs_csi_driver" {
-  count      = var.enable_ebs_csi_driver ? 1 : 0
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-  role       = aws_iam_role.ebs_csi_driver[0].name
-}
-resource "aws_eks_addon" "ebs_csi_driver" {
-  count = var.enable_ebs_csi_driver ? 1 : 0
 
-  cluster_name             = aws_eks_cluster.main.name
-  addon_name               = "aws-ebs-csi-driver"
-  service_account_role_arn = aws_iam_role.ebs_csi_driver[0].arn
-
-  depends_on = [
-    aws_eks_node_group.main,
-    aws_iam_role_policy_attachment.ebs_csi_driver
-  ]
-}
 
 
 // IRSA for ALB Ingress Controller
@@ -120,9 +81,54 @@ resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
   role       = aws_iam_role.aws_load_balancer_controller[0].name
 }
 
-data "aws_caller_identity" "current" {}
+
+
+
+// IRSA for EBS CSI Driver
+resource "aws_iam_role" "ebs_csi_driver" {
+  count = var.enable_ebs_csi_driver ? 1 : 0
+  name = "${var.cluster_name}-ebs-csi-driver-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "ebs_csi_driver" {
+  count      = var.enable_ebs_csi_driver ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  role       = aws_iam_role.ebs_csi_driver[0].name
+}
+resource "aws_eks_addon" "ebs_csi_driver" {
+  count = var.enable_ebs_csi_driver ? 1 : 0
+
+  cluster_name             = aws_eks_cluster.main.name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.ebs_csi_driver[0].arn
+
+  depends_on = [
+    aws_eks_node_group.main,
+    aws_iam_role_policy_attachment.ebs_csi_driver
+  ]
+}
 
 // IRSA for External Secrets Operator
+data "aws_caller_identity" "current" {}
+
 resource "aws_iam_role" "external_secrets" {
   count = var.enable_external_secrets ? 1 : 0
   name  = "${var.cluster_name}-external-secrets-role"

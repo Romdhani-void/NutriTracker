@@ -96,3 +96,7 @@ ingress:
     userService: /users
     goalService: /goals
     dailyLogService: /logs
+
+    dailyLog:
+  image:
+    tag: "metrics-v1"

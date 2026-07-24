@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: daily-log-service-monitor
+  namespace: nutri-track
+  labels:
+    # This label is crucial! It tells Prometheus to pick up this monitor
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: daily-log-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

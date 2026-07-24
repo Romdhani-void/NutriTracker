@@ -1,0 +1,10 @@
+grafana:
+  enabled: true
+  # You will use 'admin' as the username and this password to log in
+  adminPassword: "prom-operator" 
+
+prometheus:
+  prometheusSpec:
+    # This allows Prometheus to automatically discover ServiceMonitors in any namespace (like your nutri-track namespace)
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false

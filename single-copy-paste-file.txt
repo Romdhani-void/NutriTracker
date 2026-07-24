@@ -1,0 +1,1970 @@
+# Combined Terraform + Helm content for copy/paste
+
+===== FILE: terraform/modules/eks/main.tf =====
+
+resource "aws_eks_cluster" "main" {
+  name     = var.cluster_name
+  role_arn = var.eks_cluster_role_arn
+  version  = var.eks_version
+
+  vpc_config {
+    subnet_ids = var.private_subnet_ids
+  }
+}
+
+resource "aws_eks_node_group" "main" {
+    cluster_name = aws_eks_cluster.main.name
+    node_group_name = "${var.cluster_name}-node-group"
+    node_role_arn = var.eks_node_role_arn
+    subnet_ids = var.private_subnet_ids
+    instance_types = var.eks_node_instance_types
+
+    scaling_config {
+        desired_size = var.node_desired_size    
+        max_size     = var.node_max_size
+        min_size     = var.node_min_size
+    }
+
+    depends_on = [aws_eks_cluster.main]
+}
+
+// OIDC
+data "tls_certificate" "eks_oidc" {
+  url = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+resource "aws_iam_openid_connect_provider" "eks" {
+  url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
+}
+
+
+
+
+
+// IRSA for ALB Ingress Controller
+resource "aws_iam_role" "aws_load_balancer_controller" {
+  count = var.enable_aws_load_balancer_controller ? 1 : 0
+
+  name = "${var.cluster_name}-aws-load-balancer-controller-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = "sts:AssumeRoleWithWebIdentity"
+
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        }
+
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "aws_load_balancer_controller" {
+  count = var.enable_aws_load_balancer_controller ? 1 : 0
+
+  name        = "${var.cluster_name}-aws-load-balancer-controller-policy"
+  description = "IAM policy for AWS Load Balancer Controller"
+
+  policy = file("${path.module}/aws-load-balancer-controller-policy.json")
+}
+resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
+  count      = var.enable_aws_load_balancer_controller ? 1 : 0
+  policy_arn = aws_iam_policy.aws_load_balancer_controller[0].arn
+  role       = aws_iam_role.aws_load_balancer_controller[0].name
+}
+
+
+
+
+// IRSA for EBS CSI Driver
+resource "aws_iam_role" "ebs_csi_driver" {
+  count = var.enable_ebs_csi_driver ? 1 : 0
+  name = "${var.cluster_name}-ebs-csi-driver-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "ebs_csi_driver" {
+  count      = var.enable_ebs_csi_driver ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  role       = aws_iam_role.ebs_csi_driver[0].name
+}
+resource "aws_eks_addon" "ebs_csi_driver" {
+  count = var.enable_ebs_csi_driver ? 1 : 0
+
+  cluster_name             = aws_eks_cluster.main.name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.ebs_csi_driver[0].arn
+
+  depends_on = [
+    aws_eks_node_group.main,
+    aws_iam_role_policy_attachment.ebs_csi_driver
+  ]
+}
+
+// IRSA for External Secrets Operator
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role" "external_secrets" {
+  count = var.enable_external_secrets ? 1 : 0
+  name  = "${var.cluster_name}-external-secrets-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks.arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:external-secrets:external-secrets"
+            "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "external_secrets" {
+  count = var.enable_external_secrets ? 1 : 0
+
+  name        = "${var.cluster_name}-external-secrets-policy"
+  description = "Allow External Secrets Operator to read Secrets Manager secrets"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.secrets_manager_name_prefix}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "external_secrets" {
+  count      = var.enable_external_secrets ? 1 : 0
+  policy_arn = aws_iam_policy.external_secrets[0].arn
+  role       = aws_iam_role.external_secrets[0].name
+}
+
+
+===== FILE: terraform/modules/eks/output.tf =====
+
+output "cluster_name"{
+    value = aws_eks_cluster.main.name
+}
+
+output "cluster_certificate_authority_data" {
+  value = aws_eks_cluster.main.certificate_authority[0].data
+}
+
+output "cluster_endpoint" {
+  value = aws_eks_cluster.main.endpoint
+}
+
+output "cluster_oidc_issuer_url" {
+  description = "OIDC issuer URL for the EKS cluster"
+  value       = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+
+output "aws_load_balancer_controller_role_arn" {
+  description = "IAM role ARN for AWS Load Balancer Controller"
+  value       = var.enable_aws_load_balancer_controller ? aws_iam_role.aws_load_balancer_controller[0].arn : null
+}
+
+output "external_secrets_role_arn" {
+  description = "IAM role ARN for External Secrets Operator"
+  value       = var.enable_external_secrets ? aws_iam_role.external_secrets[0].arn : null
+}
+
+
+===== FILE: terraform/modules/eks/variable.tf =====
+
+variable "cluster_name"{
+    description = "The name of the EKS cluster"
+    type        = string
+}
+
+variable "cluster_role_arn" {
+  type = string
+}
+
+variable "eks_version"{
+    description = "The version of the EKS cluster"
+    type        = string
+}
+
+variable "private_subnet_ids" {
+  description = "List of private subnet IDs for the EKS cluster"
+  type        = list(string)
+}
+
+variable "eks_node_role_arn" {
+  description = "The ARN of the IAM role for the EKS node group"
+  type        = string
+}
+
+variable "eks_node_instance_types" {
+  description = "List of instance types for the EKS node group"
+  type        = list(string)
+}
+
+variable "node_desired_size"{
+    description = "The desired size of the EKS node group"
+    type        = number
+}
+
+variable "eks_cluster_role_arn"{
+    description = "The ARN of the IAM role for the EKS cluster"
+    type        = string
+}
+
+variable "node_max_size"{
+    description = "The maximum size of the EKS node group"
+    type        = number
+}
+
+variable "node_min_size"{
+    description = "The minimum size of the EKS node group"
+    type        = number
+}
+
+variable "enable_ebs_csi_driver" {
+  description = "Whether to enable the EBS CSI driver"
+  type        = bool
+}
+
+variable "enable_aws_load_balancer_controller" {
+  description = "Whether to enable the AWS Load Balancer Controller"
+  type        = bool
+}
+
+variable "enable_external_secrets" {
+  description = "Whether to create IRSA for External Secrets Operator"
+  type        = bool
+  default     = false
+}
+
+variable "aws_region" {
+  description = "AWS region (used in Secrets Manager IAM policy scope)"
+  type        = string
+}
+
+variable "secrets_manager_name_prefix" {
+  description = "Prefix for Secrets Manager secret names ESO is allowed to read"
+  type        = string
+  default     = "nutritracker/dev"
+}
+
+
+===== FILE: terraform/modules/eks/aws-load-balancer-controller-policy.json =====
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateServiceLinkedRole"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeAccountAttributes",
+                "ec2:DescribeAddresses",
+                "ec2:DescribeAvailabilityZones",
+                "ec2:DescribeInternetGateways",
+                "ec2:DescribeVpcs",
+                "ec2:DescribeVpcPeeringConnections",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeInstances",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:DescribeTags",
+                "ec2:GetCoipPoolUsage",
+                "ec2:DescribeCoipPools",
+                "ec2:GetSecurityGroupsForVpc",
+                "ec2:DescribeIpamPools",
+                "ec2:DescribeRouteTables",
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeLoadBalancerAttributes",
+                "elasticloadbalancing:DescribeListeners",
+                "elasticloadbalancing:DescribeListenerCertificates",
+                "elasticloadbalancing:DescribeSSLPolicies",
+                "elasticloadbalancing:DescribeRules",
+                "elasticloadbalancing:DescribeTargetGroups",
+                "elasticloadbalancing:DescribeTargetGroupAttributes",
+                "elasticloadbalancing:DescribeTargetHealth",
+                "elasticloadbalancing:DescribeTags",
+                "elasticloadbalancing:DescribeTrustStores",
+                "elasticloadbalancing:DescribeListenerAttributes",
+                "elasticloadbalancing:DescribeCapacityReservation"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cognito-idp:DescribeUserPoolClient",
+                "acm:ListCertificates",
+                "acm:DescribeCertificate",
+                "iam:ListServerCertificates",
+                "iam:GetServerCertificate",
+                "waf-regional:GetWebACL",
+                "waf-regional:GetWebACLForResource",
+                "waf-regional:AssociateWebACL",
+                "waf-regional:DisassociateWebACL",
+                "wafv2:GetWebACL",
+                "wafv2:GetWebACLForResource",
+                "wafv2:AssociateWebACL",
+                "wafv2:DisassociateWebACL",
+                "shield:GetSubscriptionState",
+                "shield:DescribeProtection",
+                "shield:CreateProtection",
+                "shield:DeleteProtection"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:RevokeSecurityGroupIngress"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:CreateSecurityGroup"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:CreateTags"
+            ],
+            "Resource": "arn:aws:ec2:*:*:security-group/*",
+            "Condition": {
+                "StringEquals": {
+                    "ec2:CreateAction": "CreateSecurityGroup"
+                },
+                "Null": {
+                    "aws:RequestTag/elbv2.k8s.aws/cluster": "false"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:CreateTags",
+                "ec2:DeleteTags"
+            ],
+            "Resource": "arn:aws:ec2:*:*:security-group/*",
+            "Condition": {
+                "Null": {
+                    "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
+                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:RevokeSecurityGroupIngress",
+                "ec2:DeleteSecurityGroup"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "Null": {
+                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:CreateLoadBalancer",
+                "elasticloadbalancing:CreateTargetGroup"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "Null": {
+                    "aws:RequestTag/elbv2.k8s.aws/cluster": "false"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:CreateListener",
+                "elasticloadbalancing:DeleteListener",
+                "elasticloadbalancing:CreateRule",
+                "elasticloadbalancing:DeleteRule"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:AddTags",
+                "elasticloadbalancing:RemoveTags"
+            ],
+            "Resource": [
+                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
+            ],
+            "Condition": {
+                "Null": {
+                    "aws:RequestTag/elbv2.k8s.aws/cluster": "true",
+                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:AddTags",
+                "elasticloadbalancing:RemoveTags"
+            ],
+            "Resource": [
+                "arn:aws:elasticloadbalancing:*:*:listener/net/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener/app/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener-rule/net/*/*/*",
+                "arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:ModifyLoadBalancerAttributes",
+                "elasticloadbalancing:SetIpAddressType",
+                "elasticloadbalancing:SetSecurityGroups",
+                "elasticloadbalancing:SetSubnets",
+                "elasticloadbalancing:DeleteLoadBalancer",
+                "elasticloadbalancing:ModifyTargetGroup",
+                "elasticloadbalancing:ModifyTargetGroupAttributes",
+                "elasticloadbalancing:DeleteTargetGroup",
+                "elasticloadbalancing:ModifyListenerAttributes",
+                "elasticloadbalancing:ModifyCapacityReservation",
+                "elasticloadbalancing:ModifyIpPools"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "Null": {
+                    "aws:ResourceTag/elbv2.k8s.aws/cluster": "false"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:AddTags"
+            ],
+            "Resource": [
+                "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+                "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "elasticloadbalancing:CreateAction": [
+                        "CreateTargetGroup",
+                        "CreateLoadBalancer"
+                    ]
+                },
+                "Null": {
+                    "aws:RequestTag/elbv2.k8s.aws/cluster": "false"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:RegisterTargets",
+                "elasticloadbalancing:DeregisterTargets"
+            ],
+            "Resource": "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:SetWebAcl",
+                "elasticloadbalancing:ModifyListener",
+                "elasticloadbalancing:AddListenerCertificates",
+                "elasticloadbalancing:RemoveListenerCertificates",
+                "elasticloadbalancing:ModifyRule",
+                "elasticloadbalancing:SetRulePriorities"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+
+
+===== FILE: terraform/modules/iam/main.tf =====
+
+resource "aws_iam_role" "eks_cluster_role" {
+name = "${var.cluster_name}-cluster-role"
+assume_role_policy = jsonencode({
+  Version = "2012-10-17"
+  Statement = [
+    {
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "eks.amazonaws.com"
+      }
+          },
+  ]
+} )
+}
+
+
+resource "aws_iam_role_policy_attachment" "eks_cluster_role_attachment" {
+  role       = aws_iam_role.eks_cluster_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
+//--node group role
+resource "aws_iam_role" "eks_node_group_role" {
+  name = "${var.cluster_name}-node-group-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      },
+    ]
+  } )
+}
+
+// let EC2 instances in the node group assume this role
+resource "aws_iam_role_policy_attachment" "eks_worker_node_policy_attachment" {
+  role       = aws_iam_role.eks_node_group_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
+//let EC2 nodes work with EKS CNI plugin for networking
+resource "aws_iam_role_policy_attachment" "eks_cni_policy_attachment" {
+  role       = aws_iam_role.eks_node_group_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+//let EC2 nodes pull container images from ECR
+resource "aws_iam_role_policy_attachment" "ecr_read_only_policy_attachment" {
+  role       = aws_iam_role.eks_node_group_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+
+===== FILE: terraform/modules/iam/output.tf =====
+
+output "eks_cluster_role_arn" {
+    value = aws_iam_role.eks_cluster_role.arn
+}
+
+output "eks_node_group_role_arn" {
+    value = aws_iam_role.eks_node_group_role.arn
+}
+
+
+
+===== FILE: terraform/modules/iam/variable.tf =====
+
+variable "cluster_name"{
+    description = "The name of the EKS cluster"
+    type        = string
+}
+
+
+===== FILE: helm/nutri-track/Chart.yaml =====
+
+apiVersion: v2
+name: nutri-track
+description: Helm chart for NutriTracker microservices on Kubernetes
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+
+===== FILE: helm/nutri-track/values.yaml =====
+
+# Dev overrides (safe to commit — no credentials).
+# App secrets are synced from AWS Secrets Manager via External Secrets Operator.
+# Seed AWS first: scripts/bootstrap-aws-secrets.ps1 (or .sh)
+
+global:
+  imageRegistry: "566167302576.dkr.ecr.eu-central-1.amazonaws.com"
+  imagePullPolicy: IfNotPresent
+  namespace: nutri-track
+
+mongo:
+  enabled: true
+  name: mongo
+  image:
+    repository: nutritracker-mongodb-dev
+    tag: "v1"
+  port: 27017
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: gp2
+  service:
+    name: mongo
+    port: 27017
+    targetPort: 27017
+    type: ClusterIP
+
+frontend:
+  name: nutri-track
+  replicas: 1
+  image:
+    repository: nutritracker-frontend-dev
+    tag: v1
+  service:
+    name: nutri-track-frontend-service
+    port: 80
+    targetPort: 80
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+userService:
+  name: user-service
+  replicas: 1
+  image:
+    repository: nutritracker-user-service-dev
+    tag: v1
+  port: 3001
+  service:
+    name: user-service
+    port: 3001
+    targetPort: 3001
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+goalService:
+  name: goal-service
+  replicas: 1
+  image:
+    repository: nutritracker-goal-service-dev
+    tag: v1
+  port: 3002
+  service:
+    name: goal-service
+    port: 3002
+    targetPort: 3002
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+dailyLog:
+  name: daily-log-service
+  replicas: 1
+  image:
+    repository: nutritracker-daily-log-service-dev
+    tag: v1
+  port: 3003
+  service:
+    name: daily-log-service
+    port: 3003
+    targetPort: 3003
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+  host: ""
+  paths:
+    frontend: /
+    userService: /users
+    goalService: /goals
+    dailyLogService: /logs
+
+
+===== FILE: helm/nutri-track/values-dev.yaml =====
+
+# Dev overrides (safe to commit — no credentials).
+# App secrets are synced from AWS Secrets Manager via External Secrets Operator.
+# Seed AWS first: scripts/bootstrap-aws-secrets.ps1 (or .sh)
+
+global:
+  imageRegistry: "566167302576.dkr.ecr.eu-central-1.amazonaws.com"
+  imagePullPolicy: IfNotPresent
+  namespace: nutri-track
+
+mongo:
+  enabled: true
+  name: mongo
+  image:
+    repository: mongo
+    tag: "7"
+  port: 27017
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: gp2
+  service:
+    name: mongo
+    port: 27017
+    targetPort: 27017
+    type: ClusterIP
+
+frontend:
+  name: nutri-track
+  replicas: 1
+  image:
+    repository: nutritracker-frontend-dev
+    tag: v1
+  service:
+    name: nutri-track-frontend-service
+    port: 80
+    targetPort: 80
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+userService:
+  name: user-service
+  replicas: 1
+  image:
+    repository: nutritracker-user-service-dev
+    tag: v1
+  port: 3001
+  service:
+    name: user-service
+    port: 3001
+    targetPort: 3001
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+goalService:
+  name: goal-service
+  replicas: 1
+  image:
+    repository: nutritracker-goal-service-dev
+    tag: v1
+  port: 3002
+  service:
+    name: goal-service
+    port: 3002
+    targetPort: 3002
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+dailyLog:
+  name: daily-log-service
+  replicas: 1
+  image:
+    repository: nutritracker-daily-log-service-dev
+    tag: v1
+  port: 3003
+  service:
+    name: daily-log-service
+    port: 3003
+    targetPort: 3003
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+  host: ""
+  paths:
+    frontend: /
+    userService: /users
+    goalService: /goals
+    dailyLogService: /logs
+
+
+===== FILE: helm/nutri-track/values-dev.example.yaml =====
+
+# Example dev values — copy to values-dev.yaml and adjust non-secret settings.
+# Credentials live in AWS Secrets Manager (see scripts/bootstrap-aws-secrets.ps1).
+
+global:
+  imageRegistry: "YOUR_ACCOUNT.dkr.ecr.eu-central-1.amazonaws.com"
+  imagePullPolicy: IfNotPresent
+  namespace: nutri-track
+
+mongo:
+  enabled: true
+  name: mongo
+  image:
+    repository: nutritracker-mongo
+    tag: "v1"
+  port: 27017
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: gp2
+  service:
+    name: mongo
+    port: 27017
+    targetPort: 27017
+    type: ClusterIP
+
+frontend:
+  name: nutri-track
+  replicas: 1
+  image:
+    repository: nutritracker-frontend
+    tag: v1
+  service:
+    name: nutri-track-frontend-service
+    port: 80
+    targetPort: 80
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+userService:
+  name: user-service
+  replicas: 1
+  image:
+    repository: nutritracker-backend
+    tag: user-service-v1
+  port: 3001
+  service:
+    name: user-service
+    port: 3001
+    targetPort: 3001
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+goalService:
+  name: goal-service
+  replicas: 1
+  image:
+    repository: nutritracker-backend
+    tag: goal-service-v1
+  port: 3002
+  service:
+    name: goal-service
+    port: 3002
+    targetPort: 3002
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+dailyLog:
+  name: daily-log-service
+  replicas: 1
+  image:
+    repository: nutritracker-backend
+    tag: daily-log-service-v1
+  port: 3003
+  service:
+    name: daily-log-service
+    port: 3003
+    targetPort: 3003
+    portName: http
+    type: ClusterIP
+    protocol: TCP
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+  host: ""
+  paths:
+    frontend: /
+    userService: /users
+    goalService: /goals
+    dailyLogService: /logs
+
+
+===== FILE: helm/nutri-track/templates/ingress.yaml =====
+
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nutri-track-ingress
+  annotations:
+    {{- range $key, $value := .Values.ingress.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host }}
+      {{- end }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.paths.frontend }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.frontend.service.name }}
+                port:
+                  number: {{ .Values.frontend.service.port }}
+          - path: {{ .Values.ingress.paths.userService }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.userService.service.name }}
+                port:
+                  number: {{ .Values.userService.service.port }}
+          - path: {{ .Values.ingress.paths.goalService }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.goalService.service.name }}
+                port:
+                  number: {{ .Values.goalService.service.port }}
+          - path: {{ .Values.ingress.paths.dailyLogService }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.dailyLog.service.name }}
+                port:
+                  number: {{ .Values.dailyLog.service.port }}
+{{- end }}
+
+
+===== FILE: helm/nutri-track/templates/frontend/deployment.yaml =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.frontend.name }}-frontend
+  labels:
+    app: {{ .Values.frontend.name }}-frontend
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.frontend.name }}-frontend
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.frontend.name }}-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: {{- if .Values.global.imageRegistry }} {{ printf "%s/%s:%s" .Values.global.imageRegistry .Values.frontend.image.repository .Values.frontend.image.tag | quote }} {{- else }} {{ printf "%s:%s" .Values.frontend.image.repository .Values.frontend.image.tag | quote }} {{- end }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.service.targetPort }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
+
+===== FILE: helm/nutri-track/templates/frontend/service.yaml =====
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.frontend.service.name }}
+  labels:
+    app: {{ .Values.frontend.service.name }}
+spec:
+  type: {{ .Values.frontend.service.type | default "ClusterIP" }}
+  ports:
+    - name: {{ .Values.frontend.service.portName | default "http" }}
+      protocol: {{ .Values.frontend.service.protocol | default "TCP" }}
+      port: {{ .Values.frontend.service.port }}
+      targetPort: {{ .Values.frontend.service.targetPort }}
+  selector:
+    app: {{ .Values.frontend.name }}-frontend
+
+
+===== FILE: helm/nutri-track/templates/user-service/deployment.yaml =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.userService.name }}
+  labels:
+    app: {{ .Values.userService.name }}
+spec:
+  replicas: {{ .Values.userService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.userService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.userService.name }}
+    spec:
+      containers:
+        - name: {{ .Values.userService.name }}
+          image: {{- if .Values.global.imageRegistry }} {{ printf "%s/%s:%s" .Values.global.imageRegistry .Values.userService.image.repository .Values.userService.image.tag | quote }} {{- else }} {{ printf "%s:%s" .Values.userService.image.repository .Values.userService.image.tag | quote }} {{- end }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.userService.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.userService.name }}-secret
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+
+
+===== FILE: helm/nutri-track/templates/user-service/service.yaml =====
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.userService.service.name }}
+  labels:
+    app: {{ .Values.userService.name }}
+spec:
+  type: {{ .Values.userService.service.type | default "ClusterIP" }}
+  selector:
+    app: {{ .Values.userService.name }}
+  ports:
+    - name: {{ .Values.userService.service.portName | default "http" }}
+      protocol: {{ .Values.userService.service.protocol | default "TCP" }}
+      port: {{ .Values.userService.service.port }}
+      targetPort: {{ .Values.userService.service.targetPort }}
+
+
+===== FILE: helm/nutri-track/templates/goal-service/deployment.yaml =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.goalService.name }}
+  labels:
+    app: {{ .Values.goalService.name }}
+spec:
+  replicas: {{ .Values.goalService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.goalService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.goalService.name }}
+    spec:
+      containers:
+        - name: {{ .Values.goalService.name }}
+          image: {{- if .Values.global.imageRegistry }} {{ printf "%s/%s:%s" .Values.global.imageRegistry .Values.goalService.image.repository .Values.goalService.image.tag | quote }} {{- else }} {{ printf "%s:%s" .Values.goalService.image.repository .Values.goalService.image.tag | quote }} {{- end }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.goalService.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.goalService.name }}-secret
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+
+
+===== FILE: helm/nutri-track/templates/goal-service/service.yaml =====
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.goalService.service.name }}
+  labels:
+    app: {{ .Values.goalService.name }}
+spec:
+  type: {{ .Values.goalService.service.type | default "ClusterIP" }}
+  selector:
+    app: {{ .Values.goalService.name }}
+  ports:
+    - name: {{ .Values.goalService.service.portName | default "http" }}
+      protocol: {{ .Values.goalService.service.protocol | default "TCP" }}
+      port: {{ .Values.goalService.service.port }}
+      targetPort: {{ .Values.goalService.service.targetPort }}
+
+
+===== FILE: helm/nutri-track/templates/daily-log-service/deployment.yaml =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.dailyLog.name }}
+  labels:
+    app: {{ .Values.dailyLog.name }}
+spec:
+  replicas: {{ .Values.dailyLog.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.dailyLog.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.dailyLog.name }}
+    spec:
+      containers:
+        - name: {{ .Values.dailyLog.name }}
+          image: {{- if .Values.global.imageRegistry }} {{ printf "%s/%s:%s" .Values.global.imageRegistry .Values.dailyLog.image.repository .Values.dailyLog.image.tag | quote }} {{- else }} {{ printf "%s:%s" .Values.dailyLog.image.repository .Values.dailyLog.image.tag | quote }} {{- end }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.dailyLog.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.dailyLog.name }}-secret
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+
+
+===== FILE: helm/nutri-track/templates/daily-log-service/service.yaml =====
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.dailyLog.service.name }}
+  labels:
+    app: {{ .Values.dailyLog.name }}
+spec:
+  type: {{ .Values.dailyLog.service.type | default "ClusterIP" }}
+  selector:
+    app: {{ .Values.dailyLog.name }}
+  ports:
+    - name: {{ .Values.dailyLog.service.portName | default "http" }}
+      protocol: {{ .Values.dailyLog.service.protocol | default "TCP" }}
+      port: {{ .Values.dailyLog.service.port }}
+      targetPort: {{ .Values.dailyLog.service.targetPort }}
+
+
+===== FILE: helm/nutri-track/templates/mongo/deployment.yaml =====
+
+{{- if .Values.mongo.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.mongo.name }}
+  labels:
+    app: {{ .Values.mongo.name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Values.mongo.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.mongo.name }}
+    spec:
+      containers:
+        - name: mongo
+          image: {{ printf "%s:%s" .Values.mongo.image.repository .Values.mongo.image.tag | quote }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: mongo
+              containerPort: {{ .Values.mongo.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.mongo.name }}-secret
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: mongo-data
+          {{- if .Values.mongo.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.mongo.name }}-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}
+
+
+===== FILE: helm/nutri-track/templates/mongo/service.yaml =====
+
+{{- if .Values.mongo.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.mongo.service.name }}
+  labels:
+    app: {{ .Values.mongo.name }}
+spec:
+  type: {{ .Values.mongo.service.type | default "ClusterIP" }}
+  selector:
+    app: {{ .Values.mongo.name }}
+  ports:
+    - name: mongo
+      port: {{ .Values.mongo.service.port }}
+      targetPort: {{ .Values.mongo.service.targetPort }}
+{{- end }}
+
+
+===== FILE: helm/nutri-track/templates/mongo/pvc.yaml =====
+
+{{- if and .Values.mongo.enabled .Values.mongo.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.mongo.name }}-pvc
+  labels:
+    app: {{ .Values.mongo.name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.mongo.persistence.size }}
+  {{- if .Values.mongo.persistence.storageClassName }}
+  storageClassName: {{ .Values.mongo.persistence.storageClassName }}
+  {{- end }}
+{{- end }}
+
+
+===== FILE: helm/controllers/aws-load-balancer-controller-values.yaml =====
+
+clusterName: nutri-eks-cluster
+
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::566167302576:role/nutri-eks-cluster-aws-load-balancer-controller-role"
+
+region: eu-central-1
+
+vpcId: "vpc-0d50e6d8f79887c4d"
+
+
+===== FILE: helm/controllers/cluster-secret-store.yaml =====
+
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: aws-secrets-manager
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: eu-central-1
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: external-secrets
+            namespace: external-secrets
+
+
+===== FILE: helm/controllers/external-secrets-values.yaml =====
+
+installCRDs: true
+
+serviceAccount:
+  create: true
+  name: external-secrets
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::566167302576:role/nutri-eks-cluster-external-secrets-role"
+
+
+===== FILE: helm/controllers/external-secrets/user-service.yaml =====
+
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: user-service-secret
+  namespace: nutri-track
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: user-service-secret
+    creationPolicy: Owner
+  dataFrom:
+    - extract:
+        key: nutritracker/dev/user-service
+
+
+===== FILE: helm/controllers/external-secrets/goal-service.yaml =====
+
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: goal-service-secret
+  namespace: nutri-track
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: goal-service-secret
+    creationPolicy: Owner
+  dataFrom:
+    - extract:
+        key: nutritracker/dev/goal-service
+
+
+===== FILE: helm/controllers/external-secrets/daily-log-service.yaml =====
+
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: daily-log-service-secret
+  namespace: nutri-track
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: daily-log-service-secret
+    creationPolicy: Owner
+  dataFrom:
+    - extract:
+        key: nutritracker/dev/daily-log-service
+
+
+===== FILE: helm/controllers/external-secrets/mongo.yaml =====
+
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: mongo-secret
+  namespace: nutri-track
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: mongo-secret
+    creationPolicy: Owner
+  dataFrom:
+    - extract:
+        key: nutritracker/dev/mongo
+
+
+# ============================================================================
+# NutriTracker project snapshot and CI/CD runbook
+# ============================================================================
+#
+# This file is a copy/paste reference for the project configuration. It keeps
+# the infrastructure and Helm files above, and includes the executable CI/CD
+# pipeline and the commands needed to reproduce the deployment.
+#
+# Do not copy secrets, Terraform state, generated dependency folders, or
+# Angular/Vite cache files into this document. The following files are local or
+# sensitive and are intentionally excluded:
+#   .env
+#   terraform.tfstate and terraform/live/*/terraform.tfstate*
+#   node_modules/
+#   frontend/.angular/
+#
+# Architecture
+#   frontend (Angular 17 + TailwindCSS, port 80 in Docker / 4200 locally)
+#   user-service (Node.js/Express, port 3001)
+#   goal-service (Node.js/Express, port 3002)
+#   daily-log-service (Node.js/Express, port 3003)
+#   MongoDB (port 27017)
+#
+# AWS/Kubernetes
+#   Terraform creates VPC networking, IAM, EKS, ECR, OIDC/IRSA, EBS CSI,
+#   AWS Load Balancer Controller permissions, and External Secrets permissions.
+#   Helm deploys the application into namespace nutri-track.
+#   AWS Secrets Manager is the source of runtime application secrets.
+
+
+===== FILE: compose.yaml =====
+
+name: nutri-track
+services:
+  mongo:
+    image: mongo:latest
+    container_name: mongo-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    depends_on:
+      - mongo
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/
+      ME_CONFIG_BASICAUTH_ENABLED: true
+      ME_CONFIG_BASICAUTH_USERNAME: ${ME_CONFIG_BASICAUTH_USERNAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_CONFIG_BASICAUTH_PASSWORD}
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: nutri-track-frontend:local
+    container_name: frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - daily-log-service
+      - goal-service
+      - user-service
+
+  daily-log-service:
+    build:
+      context: ./backend/daily-log-service
+      dockerfile: Dockerfile
+    image: nutri-track-daily-log-service:local
+    container_name: daily-log-service
+    ports:
+      - "3003:3003"
+    environment:
+      - MONGO_URI=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/cozy-calories-logs?authSource=admin
+      - GOAL_SERVICE_URL=http://goal-service:3002
+    depends_on:
+      - mongo
+
+  goal-service:
+    build:
+      context: ./backend/goal-service
+      dockerfile: Dockerfile
+    image: nutri-track-goal-service:local
+    container_name: goal-service
+    ports:
+      - "3002:3002"
+    environment:
+      - MONGO_URI=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/cozy-calories-goals?authSource=admin
+    depends_on:
+      - mongo
+
+  user-service:
+    build:
+      context: ./backend/user-service
+      dockerfile: Dockerfile
+    image: nutri-track-user-service:local
+    container_name: user-service
+    ports:
+      - "3001:3001"
+    environment:
+      - MONGO_URI=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/cozy-calories-users?authSource=admin
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - TOKEN_EXPIRY_MINUTES=${TOKEN_EXPIRY_MINUTES}
+    depends_on:
+      - mongo
+
+volumes:
+  mongo_data:
+
+
+===== FILE: terraform/live/dev/main.tf =====
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
+module "frontend_ecr" {
+  source = "../../modules/ecr"
+  name = "${lower(var.project_name)}-frontend-${var.environment}"
+  image_tag_mutability = var.image_tag_mutability
+}
+
+module "daily_log_service_ecr" {
+  source = "../../modules/ecr"
+  name = "${lower(var.project_name)}-daily-log-service-${var.environment}"
+  image_tag_mutability = var.image_tag_mutability
+}
+
+module "goal_service_ecr" {
+  source = "../../modules/ecr"
+  name = "${lower(var.project_name)}-goal-service-${var.environment}"
+  image_tag_mutability = var.image_tag_mutability
+}
+
+module "user_service_ecr" {
+  source = "../../modules/ecr"
+  name = "${lower(var.project_name)}-user-service-${var.environment}"
+  image_tag_mutability = var.image_tag_mutability
+}
+
+module "mongo_ecr" {
+  source = "../../modules/ecr"
+  name = "${lower(var.project_name)}-mongodb-${var.environment}"
+  image_tag_mutability = var.image_tag_mutability
+}
+
+module "network" {
+  source = "../../modules/network"
+  cluster_name = var.cluster_name
+  vpc_cidr = var.vpc_cidr
+  subnets = var.subnets
+  azs = var.azs
+}
+
+module "iam" {
+  source = "../../modules/iam"
+  cluster_name = var.cluster_name
+}
+
+module "eks" {
+  source = "../../modules/eks"
+  cluster_name = var.cluster_name
+  eks_version = var.eks_version
+  cluster_role_arn = module.iam.eks_cluster_role_arn
+  eks_cluster_role_arn = module.iam.eks_cluster_role_arn
+  private_subnet_ids = module.network.private_subnet_ids
+  eks_node_role_arn = module.iam.eks_node_group_role_arn
+  eks_node_instance_types = var.eks_node_instance_types
+  node_desired_size = var.node_desired_size
+  node_max_size = var.node_max_size
+  node_min_size = var.node_min_size
+  enable_ebs_csi_driver = var.enable_ebs_csi_driver
+  enable_aws_load_balancer_controller = var.enable_aws_load_balancer_controller
+  enable_external_secrets = var.enable_external_secrets
+  aws_region = var.aws_region
+  secrets_manager_name_prefix = "${lower(var.project_name)}/${var.environment}"
+  depends_on = [module.iam]
+}
+
+
+===== FILE: terraform/live/dev/terraform.tfvars.example =====
+
+aws_region           = "eu-central-1"
+project_name         = "nutritracker"
+environment          = "dev"
+image_tag_mutability = "IMMUTABLE"
+vpc_cidr = "10.0.0.0/16"
+subnets = [
+  { cidr_block = "10.0.1.0/24", role = "public" },
+  { cidr_block = "10.0.11.0/24", role = "public" },
+  { cidr_block = "10.0.2.0/24", role = "private" },
+  { cidr_block = "10.0.21.0/24", role = "private" },
+  { cidr_block = "10.0.3.0/24", role = "db" },
+  { cidr_block = "10.0.31.0/24", role = "db" }
+]
+azs = ["eu-central-1a", "eu-central-1b"]
+cluster_name = "nutri-eks-cluster"
+eks_version = "1.33"
+eks_node_instance_types = ["t3.small"]
+node_desired_size = 2
+node_max_size = 3
+node_min_size = 1
+enable_ebs_csi_driver = true
+enable_aws_load_balancer_controller = true
+enable_external_secrets = true
+
+
+===== FILE: .github/workflows/main.yaml =====
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: ["devOps"]
+  pull_request:
+    branches: ["devOps"]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: |
+          cd backend/user-service
+          npm install
+          cd ../goal-service
+          npm install
+          cd ../daily-log-service
+          npm install
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies & build frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+  ecr-push:
+    needs: ["backend", "frontend"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/nutritracker-frontend-dev:1.0.${{ github.run_number }}
+      - name: Push daily-log-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/daily-log-service
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/nutritracker-daily-log-service-dev:1.0.${{ github.run_number }}
+      - name: Push goal-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/goal-service
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/nutritracker-goal-service-dev:1.0.${{ github.run_number }}
+      - name: Push user-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/user-service
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/nutritracker-user-service-dev:1.0.${{ github.run_number }}
+
+  deploy:
+    needs: ["ecr-push"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name nutri-eks-cluster --region eu-central-1
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+      - name: Add Helm repos
+        run: |
+          helm repo add eks https://aws.github.io/eks-charts
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm repo update
+      - name: Get current VPC ID
+        id: vpc
+        run: |
+          VPC_ID=$(aws eks describe-cluster --name nutri-eks-cluster --region eu-central-1 --query "cluster.resourcesVpcConfig.vpcId" --output text)
+          echo "vpc_id=$VPC_ID" >> "$GITHUB_OUTPUT"
+      - name: Install/Upgrade AWS Load Balancer Controller
+        run: |
+          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+            -n kube-system \
+            -f helm/controllers/aws-load-balancer-controller-values.yaml \
+            --set vpcId=${{ steps.vpc.outputs.vpc_id }}
+      - name: Restart AWS Load Balancer Controller to refresh webhook cert
+        run: |
+          kubectl delete secret aws-load-balancer-webhook-tls -n kube-system --ignore-not-found
+          kubectl rollout restart deployment aws-load-balancer-controller -n kube-system
+      - name: Wait for AWS Load Balancer Controller to be ready
+        run: kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=120s
+      - name: Install/Upgrade External Secrets Operator
+        run: |
+          helm upgrade --install external-secrets external-secrets/external-secrets \
+            -n external-secrets --create-namespace \
+            -f helm/controllers/external-secrets-values.yaml
+      - name: Wait for External Secrets Operator to be ready
+        run: |
+          kubectl rollout status deployment/external-secrets -n external-secrets --timeout=120s
+          kubectl rollout status deployment/external-secrets-webhook -n external-secrets --timeout=120s
+      - name: Apply ClusterSecretStore
+        run: kubectl apply -f helm/controllers/cluster-secret-store.yaml
+      - name: Apply ExternalSecrets
+        run: |
+          kubectl create namespace nutri-track --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f helm/controllers/external-secrets/user-service.yaml
+          kubectl apply -f helm/controllers/external-secrets/goal-service.yaml
+          kubectl apply -f helm/controllers/external-secrets/daily-log-service.yaml
+          kubectl apply -f helm/controllers/external-secrets/mongo.yaml
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install nutri-track helm/nutri-track \
+            -f helm/nutri-track/values-dev.yaml \
+            --set frontend.image.tag=1.0.${{ github.run_number }} \
+            --set userService.image.tag=1.0.${{ github.run_number }} \
+            --set goalService.image.tag=1.0.${{ github.run_number }} \
+            --set dailyLog.image.tag=1.0.${{ github.run_number }} \
+            --namespace nutri-track --create-namespace
+      - name: Verify app rollout
+        run: |
+          kubectl rollout status deployment/nutri-track-frontend -n nutri-track --timeout=120s
+          kubectl rollout status deployment/user-service -n nutri-track --timeout=120s
+          kubectl rollout status deployment/goal-service -n nutri-track --timeout=120s
+          kubectl rollout status deployment/daily-log-service -n nutri-track --timeout=120s
+
+
+# CI/CD pipeline behavior
+#
+# Trigger:
+#   Pushes and pull requests targeting devOps.
+#
+# 1. backend
+#   Checks out the repository, installs Node.js 20, and runs npm install for
+#   user-service, goal-service, and daily-log-service. There are no backend
+#   tests or production builds invoked by this job at present.
+#
+# 2. frontend
+#   Checks out the repository, installs Node.js 20, runs npm install, and runs
+#   npm run build in frontend.
+#
+# 3. ecr-push
+#   Runs only after backend and frontend succeed. It authenticates to AWS using
+#   repository secrets, logs in to ECR, builds four Docker images, and pushes
+#   immutable run-number tags:
+#     nutritracker-frontend-dev:1.0.<github.run_number>
+#     nutritracker-daily-log-service-dev:1.0.<github.run_number>
+#     nutritracker-goal-service-dev:1.0.<github.run_number>
+#     nutritracker-user-service-dev:1.0.<github.run_number>
+#
+# 4. deploy
+#   Runs only after ecr-push succeeds. It updates kubeconfig for
+#   nutri-eks-cluster in eu-central-1, installs or upgrades the AWS Load
+#   Balancer Controller and External Secrets Operator, applies the secret
+#   store resources, deploys the Helm release, and waits for all four app
+#   deployments to roll out successfully.
+#
+# Required GitHub Actions secrets:
+#   AWS_ACCESS_KEY_ID
+#   AWS_SECRET_ACCESS_KEY
+#   AWS_REGION (must resolve to eu-central-1 for the current deploy commands)
+#
+# Important pipeline assumptions:
+#   - Terraform has already created the ECR repositories and EKS cluster.
+#   - AWS credentials can describe the cluster and push to all four ECR repos.
+#   - Secrets Manager entries exist under nutritracker/dev/<service>.
+#   - The External Secrets IAM role is attached to the ESO service account by
+#     the installed values/configuration.
+#   - The image registry in helm/nutri-track/values-dev.yaml matches the AWS
+#     account and region used by the workflow.
+
+
+# Local development and deployment commands
+
+# Local Compose stack
+# Populate the root .env with local MongoDB, Mongo Express, and SMTP values.
+docker compose up --build
+# frontend: http://localhost, mongo-express: http://localhost:8081
+
+# Backend/frontend directly
+Set-Location backend/user-service; npm install; npm run dev
+Set-Location ../goal-service; npm install; npm run dev
+Set-Location ../daily-log-service; npm install; npm run dev
+Set-Location ../../frontend; npm install; npm start
+
+# Provision/update AWS infrastructure from the dev live directory
+terraform -chdir=terraform/live/dev init
+terraform -chdir=terraform/live/dev validate
+terraform -chdir=terraform/live/dev plan -var-file=terraform.tfvars
+terraform -chdir=terraform/live/dev apply -var-file=terraform.tfvars
+aws eks update-kubeconfig --name nutri-eks-cluster --region eu-central-1
+
+# Seed secrets and install External Secrets manually when required
+powershell -ExecutionPolicy Bypass -File scripts/bootstrap-aws-secrets.ps1
+powershell -ExecutionPolicy Bypass -File scripts/deploy-external-secrets.ps1
+
+# Validate Helm rendering before applying
+helm lint helm/nutri-track -f helm/nutri-track/values-dev.yaml
+helm template nutri-track helm/nutri-track -f helm/nutri-track/values-dev.yaml
+
+# Useful operational commands
+kubectl get pods -n nutri-track
+kubectl get ingress -n nutri-track
+kubectl get externalsecret -n nutri-track
+helm status nutri-track -n nutri-track
+powershell -ExecutionPolicy Bypass -File scripts/pre_destroy_backup.ps1
+powershell -ExecutionPolicy Bypass -File scripts/uninstall_helm_nutri.ps1
+
+
+# Repository inventory
+#
+# Application:
+#   backend/user-service/src/index.js, user.model.js, user.routes.js,
+#   email.service.js
+#   backend/goal-service/src/index.js, goal.model.js, goal.routes.js,
+#   calculator.js
+#   backend/daily-log-service/src/index.js, daily-log.model.js,
+#   daily-log.routes.js
+#   frontend/src/app/ with auth, onboarding, dashboard, history, and core
+#   Angular services/guards
+#
+# Containerization:
+#   backend/*/Dockerfile, frontend/Dockerfile, compose.yaml, .dockerignore
+#
+# Infrastructure:
+#   terraform/modules/{network,iam,eks,ecr}
+#   terraform/live/dev
+#   helm/nutri-track
+#   helm/controllers
+#   scripts/*.ps1
+#
+# Configuration files to keep aligned when changing the deployment:
+#   .github/workflows/main.yaml
+#   terraform/live/dev/terraform.tfvars
+#   helm/nutri-track/values-dev.yaml
+#   helm/controllers/aws-load-balancer-controller-values.yaml
+#   helm/controllers/external-secrets-values.yaml
+#   helm/controllers/cluster-secret-store.yaml
+
+
