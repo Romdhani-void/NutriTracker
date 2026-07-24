@@ -1,5 +1,9 @@
+# Dev overrides (safe to commit — no credentials).
+# App secrets are synced from AWS Secrets Manager via External Secrets Operator.
+# Seed AWS first: scripts/bootstrap-aws-secrets.ps1 (or .sh)
+
 global:
-  imageRegistry: ""
+  imageRegistry: "566167302576.dkr.ecr.eu-central-1.amazonaws.com"
   imagePullPolicy: IfNotPresent
   namespace: nutri-track
 
@@ -7,13 +11,13 @@ mongo:
   enabled: true
   name: mongo
   image:
-    repository: mongo
-    tag: "7"
+    repository: nutritracker-mongodb-dev
+    tag: "v1"
   port: 27017
   persistence:
     enabled: true
     size: 5Gi
-    storageClassName: ""
+    storageClassName: gp2
   service:
     name: mongo
     port: 27017
@@ -24,8 +28,8 @@ frontend:
   name: nutri-track
   replicas: 1
   image:
-    repository: nutri-track-frontend
-    tag: latest
+    repository: nutritracker-frontend-dev
+    tag: v1
   service:
     name: nutri-track-frontend-service
     port: 80
@@ -38,8 +42,8 @@ userService:
   name: user-service
   replicas: 1
   image:
-    repository: nutri-track-user-service
-    tag: latest
+    repository: nutritracker-user-service-dev
+    tag: v1
   port: 3001
   service:
     name: user-service
@@ -53,8 +57,8 @@ goalService:
   name: goal-service
   replicas: 1
   image:
-    repository: nutri-track-goal-service
-    tag: latest
+    repository: nutritracker-goal-service-dev
+    tag: v1
   port: 3002
   service:
     name: goal-service
@@ -68,8 +72,8 @@ dailyLog:
   name: daily-log-service
   replicas: 1
   image:
-    repository: nutri-track-daily-log-service
-    tag: latest
+    repository: nutritracker-daily-log-service-dev
+    tag: v1
   port: 3003
   service:
     name: daily-log-service
@@ -80,7 +84,7 @@ dailyLog:
     protocol: TCP
 
 ingress:
-  enabled: false
+  enabled: true
   className: alb
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
@@ -92,3 +96,7 @@ ingress:
     userService: /users
     goalService: /goals
     dailyLogService: /logs
+
+    dailyLog:
+  image:
+    tag: "metrics-v1"

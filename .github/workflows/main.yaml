@@ -6,54 +6,46 @@ on:
   pull_request:
     branches: ["devOps"]
 
+permissions:
+  contents: read
+
 jobs:
-  # backend validation
   backend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Install dependencies
         run: |
           cd backend/user-service
-          npm install 
+          npm install
           cd ../goal-service
-          npm install 
+          npm install
           cd ../daily-log-service
           npm install
 
-  # frontend validation
   frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Install dependencies & build frontend
         run: |
           cd frontend
           npm install
           npm run build
 
-  # Docker push
-
-  docker-push:
+  ecr-push:
     needs: ["backend", "frontend"]
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: eu-central-1
-      ECR_REGISTRY: 566167302576.dkr.ecr.eu-central-1.amazonaws.com
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -62,47 +54,133 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v1
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: push frontend
+      - name: Push frontend
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/nutri-track-frontend:latest
-            ${{ env.ECR_REGISTRY }}/nutri-track-frontend:${{ github.run_number }}
+            ${{ steps.login-ecr.outputs.registry }}/nutritracker-frontend-dev:1.0.${{ github.run_number }}
 
-      - name: push daily-log-service
+      - name: Push daily-log-service
         uses: docker/build-push-action@v5
         with:
           context: ./backend/daily-log-service
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/nutri-track-daily-log-service:latest
-            ${{ env.ECR_REGISTRY }}/nutri-track-daily-log-service:${{ github.run_number }}
+            ${{ steps.login-ecr.outputs.registry }}/nutritracker-daily-log-service-dev:1.0.${{ github.run_number }}
 
-      - name: push goal-service
+      - name: Push goal-service
         uses: docker/build-push-action@v5
         with:
           context: ./backend/goal-service
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/nutri-track-goal-service:latest
-            ${{ env.ECR_REGISTRY }}/nutri-track-goal-service:${{ github.run_number }}
+            ${{ steps.login-ecr.outputs.registry }}/nutritracker-goal-service-dev:1.0.${{ github.run_number }}
 
-      - name: push user-service
+      - name: Push user-service
         uses: docker/build-push-action@v5
         with:
           context: ./backend/user-service
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/nutri-track-user-service:latest
-            ${{ env.ECR_REGISTRY }}/nutri-track-user-service:${{ github.run_number }}
+            ${{ steps.login-ecr.outputs.registry }}/nutritracker-user-service-dev:1.0.${{ github.run_number }}
+
+  deploy:
+    needs: ["ecr-push"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name nutri-eks-cluster --region eu-central-1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Add Helm repos
+        run: |
+          helm repo add eks https://aws.github.io/eks-charts
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm repo update
+
+      - name: Get current VPC ID
+        id: vpc
+        run: |
+          VPC_ID=$(aws eks describe-cluster --name nutri-eks-cluster --region eu-central-1 --query "cluster.resourcesVpcConfig.vpcId" --output text)
+          echo "vpc_id=$VPC_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Install/Upgrade AWS Load Balancer Controller
+        run: |
+          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+            -n kube-system \
+            -f helm/controllers/aws-load-balancer-controller-values.yaml \
+            --set vpcId=${{ steps.vpc.outputs.vpc_id }}
+
+      - name: Restart AWS Load Balancer Controller to refresh webhook cert
+        run: |
+          kubectl delete secret aws-load-balancer-webhook-tls -n kube-system --ignore-not-found
+          kubectl rollout restart deployment aws-load-balancer-controller -n kube-system
+
+      - name: Wait for AWS Load Balancer Controller to be ready
+        run: |
+          kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=120s
+
+      - name: Install/Upgrade External Secrets Operator
+        run: |
+          helm upgrade --install external-secrets external-secrets/external-secrets \
+            -n external-secrets \
+            --create-namespace \
+            -f helm/controllers/external-secrets-values.yaml
+
+      - name: Wait for External Secrets Operator to be ready
+        run: |
+          kubectl rollout status deployment/external-secrets -n external-secrets --timeout=120s
+          kubectl rollout status deployment/external-secrets-webhook -n external-secrets --timeout=120s
+
+      - name: Apply ClusterSecretStore
+        run: kubectl apply -f helm/controllers/cluster-secret-store.yaml
+
+      - name: Apply ExternalSecrets
+        run: |
+          kubectl create namespace nutri-track --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f helm/controllers/external-secrets/user-service.yaml
+          kubectl apply -f helm/controllers/external-secrets/goal-service.yaml
+          kubectl apply -f helm/controllers/external-secrets/daily-log-service.yaml
+          kubectl apply -f helm/controllers/external-secrets/mongo.yaml
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install nutri-track helm/nutri-track \
+            -f helm/nutri-track/values-dev.yaml \
+            --set frontend.image.tag=1.0.${{ github.run_number }} \
+            --set userService.image.tag=1.0.${{ github.run_number }} \
+            --set goalService.image.tag=1.0.${{ github.run_number }} \
+            --set dailyLog.image.tag=1.0.${{ github.run_number }} \
+            --namespace nutri-track \
+            --create-namespace
+
+      - name: Verify app rollout
+        run: |
+          kubectl rollout status deployment/nutri-track-frontend -n nutri-track --timeout=120s
+          kubectl rollout status deployment/user-service -n nutri-track --timeout=120s
+          kubectl rollout status deployment/goal-service -n nutri-track --timeout=120s
+          kubectl rollout status deployment/daily-log-service -n nutri-track --timeout=120s

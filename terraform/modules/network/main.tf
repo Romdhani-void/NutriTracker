@@ -11,7 +11,7 @@ resource "aws_subnet" "public"{
     availability_zone = each.value.az
 
     tags = {
-        name = "public-subnet-${each.key}"
+        name = "${each.key}"
         "kubernetes.io/cluster/${var.cluster_name}" = "shared"
         "kubernetes.io/role/elb" = "1"
     }

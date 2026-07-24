@@ -15,22 +15,39 @@ terraform {
 provider "aws" {
   region = var.aws_region
 }
-module "backend_ecr" {
-  source = "../../modules/ecr"
 
-  name                 = "${lower(var.project_name)}-backend"
-  image_tag_mutability = var.image_tag_mutability
-}
 module "frontend_ecr" {
   source = "../../modules/ecr"
 
-  name                 = "${lower(var.project_name)}-frontend"
+  name                 = "${lower(var.project_name)}-frontend-${var.environment}"
   image_tag_mutability = var.image_tag_mutability
 }
+
+module "daily_log_service_ecr" {
+  source = "../../modules/ecr"
+
+  name                 = "${lower(var.project_name)}-daily-log-service-${var.environment}"
+  image_tag_mutability = var.image_tag_mutability
+}
+
+module "goal_service_ecr" {
+  source = "../../modules/ecr"
+
+  name                 = "${lower(var.project_name)}-goal-service-${var.environment}"
+  image_tag_mutability = var.image_tag_mutability
+}
+
+module "user_service_ecr" {
+  source = "../../modules/ecr"
+
+  name                 = "${lower(var.project_name)}-user-service-${var.environment}"
+  image_tag_mutability = var.image_tag_mutability
+}
+
 module "mongo_ecr" {
   source = "../../modules/ecr"
 
-  name                 = "${lower(var.project_name)}-mongo"
+  name                 = "${lower(var.project_name)}-mongodb-${var.environment}"
   image_tag_mutability = var.image_tag_mutability
 }
 

@@ -11,8 +11,8 @@ mongo:
   enabled: true
   name: mongo
   image:
-    repository: nutritracker-mongo
-    tag: "v1"
+    repository: mongo
+    tag: "7"
   port: 27017
   persistence:
     enabled: true
@@ -28,7 +28,7 @@ frontend:
   name: nutri-track
   replicas: 1
   image:
-    repository: nutritracker-frontend
+    repository: nutritracker-frontend-dev
     tag: v1
   service:
     name: nutri-track-frontend-service
@@ -42,8 +42,8 @@ userService:
   name: user-service
   replicas: 1
   image:
-    repository: nutritracker-backend
-    tag: user-service-v1
+    repository: nutritracker-user-service-dev
+    tag: v1
   port: 3001
   service:
     name: user-service
@@ -57,8 +57,8 @@ goalService:
   name: goal-service
   replicas: 1
   image:
-    repository: nutritracker-backend
-    tag: goal-service-v1
+    repository: nutritracker-goal-service-dev
+    tag: v1
   port: 3002
   service:
     name: goal-service
@@ -72,8 +72,8 @@ dailyLog:
   name: daily-log-service
   replicas: 1
   image:
-    repository: nutritracker-backend
-    tag: daily-log-service-v1
+    repository: nutritracker-daily-log-service-dev
+    tag: v1
   port: 3003
   service:
     name: daily-log-service
